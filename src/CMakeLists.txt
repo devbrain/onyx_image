@@ -22,7 +22,11 @@ FetchContent_MakeAvailable(lodepng)
 
 add_library(lodepng STATIC ${lodepng_SOURCE_DIR}/lodepng.cpp)
 target_include_directories(lodepng PUBLIC $<BUILD_INTERFACE:${lodepng_SOURCE_DIR}>)
-target_compile_options(lodepng PRIVATE -w)
+# Disable warnings for third-party library (cross-platform)
+target_compile_options(lodepng PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/W0>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+)
 set_target_properties(lodepng PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # stb - single-file public domain libraries
@@ -96,11 +100,27 @@ datascript_generate(
 )
 
 # ============================================================================
-# Library Sources
+# STB Wrapper (compiled with warnings disabled)
 # ============================================================================
 
-# Disable warnings for stb_image (third-party single-header library)
-set_source_files_properties(codecs/stb.cpp PROPERTIES COMPILE_OPTIONS "-w")
+# Create separate object library for stb.cpp to isolate warning suppression
+add_library(onyx_image_stb OBJECT codecs/stb.cpp)
+target_include_directories(onyx_image_stb PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+)
+target_link_libraries(onyx_image_stb PRIVATE stb_image)
+target_compile_features(onyx_image_stb PRIVATE cxx_std_20)
+# Disable warnings for stb_image wrapper (cross-platform)
+target_compile_options(onyx_image_stb PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/W0>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+)
+
+# ============================================================================
+# Library Sources
+# ============================================================================
 
 target_sources(onyx_image PRIVATE
         types.cpp
@@ -110,7 +130,7 @@ target_sources(onyx_image PRIVATE
         codecs/pcx.cpp
         codecs/png.cpp
         codecs/lbm.cpp
-        codecs/stb.cpp
+        $<TARGET_OBJECTS:onyx_image_stb>
         codecs/bmp.cpp
         codecs/sunrast.cpp
         codecs/pictor.cpp
@@ -140,6 +160,5 @@ target_include_directories(onyx_image PRIVATE
 target_link_libraries(onyx_image PRIVATE
         onyx_image_parsers
         lodepng
-        stb_image
 )
 

@@ -326,5 +326,4 @@ MIT License - see LICENSE file for details.
 
 - [stb_image](https://github.com/nothings/stb) - JPEG, TGA, GIF decoding
 - [lodepng](https://github.com/lvandeve/lodepng) - PNG encoding/decoding
-- [libiff](https://github.com/svanderburg/libiff) - IFF/ILBM parsing
 - Format specifications from various sources including FileFormats.Wiki and ModdingWiki
