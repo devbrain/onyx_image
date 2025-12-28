@@ -1,0 +1,37 @@
+// SGI Image File Format (Silicon Graphics Image)
+// Reference: https://netghost.narod.ru/gff/vendspec/sgiimage/sgiimage.txt
+
+package formats.sgi;
+
+// SGI uses big-endian byte order
+big;
+
+// Magic number
+const uint16 SGI_MAGIC = 474;  // 0x01DA
+
+// Storage types
+const uint8 SGI_STORAGE_VERBATIM = 0;  // Uncompressed
+const uint8 SGI_STORAGE_RLE = 1;       // Run-length encoded
+
+// Colormap types
+const uint32 SGI_COLORMAP_NORMAL = 0;    // B/W, RGB, or RGBA
+const uint32 SGI_COLORMAP_DITHERED = 1;  // Obsolete: 3-3-2 packed RGB
+const uint32 SGI_COLORMAP_SCREEN = 2;    // Obsolete: color-indexed
+const uint32 SGI_COLORMAP_COLORMAP = 3;  // Image is a colormap
+
+// SGI image header (512 bytes total)
+struct sgi_header {
+    uint16 magic;           // 0: Must be 474
+    uint8  storage;         // 2: 0=verbatim, 1=RLE
+    uint8  bpc;             // 3: Bytes per channel (1 or 2)
+    uint16 dimension;       // 4: 1, 2, or 3
+    uint16 xsize;           // 6: Width in pixels
+    uint16 ysize;           // 8: Height in pixels
+    uint16 zsize;           // 10: Number of channels
+    uint32 pixmin;          // 12: Minimum pixel value
+    uint32 pixmax;          // 16: Maximum pixel value
+    uint8  dummy1[4];       // 20: Reserved
+    uint8  imagename[80];   // 24: Null-terminated image name
+    uint32 colormap;        // 104: Colormap type
+    uint8  dummy2[404];     // 108: Reserved (padding to 512 bytes)
+};

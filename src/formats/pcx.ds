@@ -1,0 +1,126 @@
+/**
+ * PCX (PC Paintbrush) Image Format
+ *
+ * Originally developed by ZSoft Corporation for PC Paintbrush.
+ * Supports 1, 2, 4, 8, and 24-bit color images with RLE compression.
+ *
+ * References:
+ * - ZSoft PCX File Format Technical Reference Manual
+ * - Encyclopedia of Graphics File Formats (EGFF)
+ */
+package formats.pcx;
+
+// PCX files use little-endian byte order
+little;
+
+// PCX signature constant
+const uint8 PCX_SIGNATURE = 0x0A;
+
+// PCX versions
+const uint8 PCX_VERSION_25 = 0;          // Version 2.5
+const uint8 PCX_VERSION_28_PALETTE = 2;  // Version 2.8 with palette
+const uint8 PCX_VERSION_28_NO_PAL = 3;   // Version 2.8 without palette
+const uint8 PCX_VERSION_WINDOWS = 4;     // PC Paintbrush for Windows
+const uint8 PCX_VERSION_30 = 5;          // Version 3.0 (256-color VGA)
+
+// Encoding types
+const uint8 PCX_ENCODING_NONE = 0;
+const uint8 PCX_ENCODING_RLE = 1;
+
+// Palette types
+const uint16 PCX_PALETTE_COLOR = 1;
+const uint16 PCX_PALETTE_GRAYSCALE = 2;
+
+// VGA palette marker (at file_size - 769)
+const uint8 PCX_VGA_PALETTE_MARKER = 0x0C;
+
+// =============================================================================
+// PCX Header (128 bytes)
+// =============================================================================
+
+/**
+ * PCX File Header
+ *
+ * The header is always 128 bytes and contains image metadata,
+ * dimensions, and the 16-color EGA palette.
+ */
+struct pcx_header {
+    uint8 signature: signature == PCX_SIGNATURE;  // Must be 0x0A
+    uint8 version;                                // PCX version (0, 2, 3, 4, 5)
+    uint8 encoding;                               // 0 = none, 1 = RLE
+    uint8 bits_per_pixel;                         // Bits per pixel per plane (1, 2, 4, 8)
+
+    // Image dimensions (inclusive coordinates)
+    uint16 x_min;                    // Left edge
+    uint16 y_min;                    // Top edge
+    uint16 x_max;                    // Right edge
+    uint16 y_max;                    // Bottom edge
+
+    // Display resolution (DPI or pixels, depending on version)
+    uint16 horz_dpi;
+    uint16 vert_dpi;
+
+    // 16-color EGA palette (48 bytes = 16 colors * 3 RGB bytes)
+    uint8 ega_palette[48];
+
+    uint8 reserved1;                 // Reserved, should be 0
+    uint8 num_planes;                // Number of color planes (1, 3, or 4)
+    uint16 bytes_per_line;           // Bytes per uncompressed scan line per plane
+    uint16 palette_type;             // 1 = color, 2 = grayscale
+
+    // Screen size (PC Paintbrush IV and later)
+    uint16 horz_screen_size;
+    uint16 vert_screen_size;
+
+    // Padding to 128 bytes
+    uint8 reserved2[54];
+};
+
+// =============================================================================
+// VGA Palette (256-color, at end of file)
+// =============================================================================
+
+/**
+ * VGA 256-color Palette
+ *
+ * For PCX version 5 (3.0) with 8 bits per pixel and 1 plane,
+ * a 256-color palette is appended at file_size - 769 bytes.
+ * The palette is preceded by a marker byte (0x0C).
+ */
+struct pcx_vga_palette {
+    uint8 marker: marker == PCX_VGA_PALETTE_MARKER;
+    uint8 colors[768];  // 256 colors * 3 RGB bytes
+};
+
+// =============================================================================
+// Usage Notes
+// =============================================================================
+
+/*
+ * PCX DECODING NOTES:
+ *
+ * Image dimensions:
+ *   width  = x_max - x_min + 1
+ *   height = y_max - y_min + 1
+ *
+ * Total bytes per scan line:
+ *   scan_line_length = bytes_per_line * num_planes
+ *
+ * Color configurations:
+ *   - 1 plane,  1 bpp: Monochrome (2 colors)
+ *   - 1 plane,  2 bpp: CGA 4-color
+ *   - 1 plane,  4 bpp: EGA 16-color
+ *   - 1 plane,  8 bpp: VGA 256-color (palette at end of file)
+ *   - 3 planes, 8 bpp: 24-bit true color (RGB, no palette)
+ *   - 4 planes, 1 bpp: EGA 16-color planar
+ *
+ * RLE Decoding:
+ *   - If (byte & 0xC0) == 0xC0: run of (byte & 0x3F) copies of next byte
+ *   - Otherwise: literal byte value
+ *   - Special case: literal bytes >= 0xC0 must be encoded as run of 1
+ *
+ * VGA Palette detection:
+ *   - Only for version 5 with 8bpp and 1 plane
+ *   - Check byte at file_size - 769 for marker 0x0C
+ *   - If present, read 768 bytes (256 * RGB)
+ */

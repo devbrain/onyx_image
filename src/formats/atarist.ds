@@ -1,0 +1,143 @@
+/**
+ * Atari ST Image Formats
+ *
+ * Common definitions for Atari ST graphics formats including:
+ * - NEO (Neochrome)
+ * - DEGAS (PI1/PI2/PI3 uncompressed, PC1/PC2/PC3 compressed)
+ * - Doodle (DOO)
+ * - Tiny Stuff (TN1/TN2/TN3)
+ *
+ * All formats use big-endian byte order (Motorola 68000).
+ *
+ * References:
+ * - RECOIL (Retro Computer Image Library)
+ * - Atari ST Graphics File Formats documentation
+ */
+package formats.atarist;
+
+// Atari ST uses big-endian byte order (Motorola 68000 CPU)
+big;
+
+// =============================================================================
+// Resolution Modes
+// =============================================================================
+
+const uint8 ST_RES_LOW = 0;      // 320x200, 16 colors, 4 bitplanes
+const uint8 ST_RES_MEDIUM = 1;   // 640x200, 4 colors, 2 bitplanes
+const uint8 ST_RES_HIGH = 2;     // 640x400, 2 colors, 1 bitplane
+
+// Screen dimensions
+const uint16 ST_LOW_WIDTH = 320;
+const uint16 ST_LOW_HEIGHT = 200;
+const uint16 ST_MEDIUM_WIDTH = 640;
+const uint16 ST_MEDIUM_HEIGHT = 200;
+const uint16 ST_HIGH_WIDTH = 640;
+const uint16 ST_HIGH_HEIGHT = 400;
+
+// Bitmap sizes in bytes (always 32000 bytes for standard screen)
+const uint32 ST_BITMAP_SIZE = 32000;
+
+// =============================================================================
+// NEO (Neochrome) Format - 32128 bytes
+// =============================================================================
+
+const uint32 NEO_FILE_SIZE = 32128;
+const uint32 NEO_HEADER_SIZE = 128;
+
+/**
+ * Neochrome File Header (128 bytes)
+ */
+struct neo_header {
+    uint16 flag;                  // Should be 0
+    uint16 resolution;            // 0=low, 1=medium, 2=high
+    uint16 palette[16];           // ST palette (16 colors)
+    uint8 filename[12];           // Original filename (space-padded)
+    uint16 color_anim_limit;      // Color animation limit
+    uint16 color_anim_speed;      // Color animation speed
+    uint16 color_anim_steps;      // Number of color animation steps
+    uint16 color_anim_direction;  // Animation direction
+    uint16 reserved[16];          // Reserved/unused
+    uint8 padding[28];            // Padding to 128 bytes
+};
+
+// =============================================================================
+// DEGAS Format - Uncompressed (PI1/PI2/PI3) and Compressed (PC1/PC2/PC3)
+// =============================================================================
+
+// Uncompressed sizes
+const uint32 DEGAS_STANDARD_SIZE = 32034;   // Standard DEGAS
+const uint32 DEGAS_ELITE_SIZE = 32066;      // DEGAS Elite with animation
+
+// Compressed marker
+const uint8 DEGAS_COMPRESSED = 0x80;
+
+/**
+ * DEGAS File Header (34 bytes for uncompressed)
+ */
+struct degas_header {
+    uint16 resolution;            // 0=low, 1=medium, 2=high (high byte 0x80 = compressed)
+    uint16 palette[16];           // ST palette (16 colors)
+};
+
+// =============================================================================
+// Doodle Format (DOO) - 32000 bytes bitmap only
+// =============================================================================
+
+const uint32 DOODLE_FILE_SIZE = 32000;
+
+// =============================================================================
+// Tiny Stuff Format (TN1/TN2/TN3)
+// =============================================================================
+
+// Tiny header is 21 bytes:
+// - 1 byte resolution
+// - 16*2 bytes palette for low/medium res
+// - 4 bytes control words
+
+/**
+ * Tiny Stuff Header
+ */
+struct tiny_header {
+    uint8 resolution;             // 0=low, 1=medium, 2=high
+    uint16 palette[16];           // ST palette (only first 4 used for medium, 2 for high)
+    uint16 control_bytes;         // Control byte count
+    uint16 data_bytes;            // Data byte count
+};
+
+// =============================================================================
+// ST Palette Color Format
+// =============================================================================
+
+/*
+ * ST 512-color palette format (9-bit RGB):
+ * Big-endian 16-bit word: 0000 0RRR 0GGG 0BBB
+ * Each component is 3 bits (0-7), scaled to 8-bit (0-255)
+ *
+ * STE 4096-color palette format (12-bit RGB):
+ * Big-endian 16-bit word: 0000 rRRR gGGG bBBB
+ * Where RRR is high 3 bits, r is low bit
+ * Each component is 4 bits (0-15), scaled to 8-bit
+ *
+ * Conversion ST -> 8-bit: component * 255 / 7 = component * 36 + component / 2
+ */
+
+// =============================================================================
+// Atari ST Bitplane Format
+// =============================================================================
+
+/*
+ * Atari ST uses interleaved bitplanes (word-interleaved):
+ *
+ * For low-res (4 bitplanes), each 16 pixels are stored as:
+ *   Word0 (plane0), Word1 (plane1), Word2 (plane2), Word3 (plane3)
+ *
+ * To get pixel color at position x:
+ *   1. Find the word group: group = x / 16
+ *   2. Find bit position: bit = 15 - (x % 16)
+ *   3. Read bits from each plane word
+ *   4. Combine: color = (bit3 << 3) | (bit2 << 2) | (bit1 << 1) | bit0
+ *
+ * Row stride for low-res: 320 pixels / 16 * 4 planes * 2 bytes = 160 bytes
+ * Row stride for medium-res: 640 pixels / 16 * 2 planes * 2 bytes = 160 bytes
+ * Row stride for high-res: 640 pixels / 16 * 1 plane * 2 bytes = 80 bytes
+ */

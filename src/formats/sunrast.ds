@@ -1,0 +1,49 @@
+/**
+ * Sun Raster Image Format
+ *
+ * Sun Raster is an image format developed by Sun Microsystems.
+ * All values are stored in big-endian byte order.
+ *
+ * References:
+ * - Encyclopedia of Graphics File Formats
+ * - Sun Raster specification
+ */
+package formats.sunrast;
+
+// Sun Raster uses big-endian byte order
+big;
+
+// Magic number
+const uint32 RAS_MAGIC = 0x59a66a95;
+
+// Raster type values
+const uint32 RT_OLD = 0;            // Old format (uncompressed)
+const uint32 RT_STANDARD = 1;       // Standard format (uncompressed)
+const uint32 RT_BYTE_ENCODED = 2;   // Run-length encoded
+const uint32 RT_RGB = 3;            // RGB format (instead of BGR)
+const uint32 RT_TIFF = 4;           // TIFF format
+const uint32 RT_IFF = 5;            // IFF format
+const uint32 RT_EXPERIMENTAL = 0xFFFF;
+
+// Colormap type values
+const uint32 RMT_NONE = 0;          // No colormap
+const uint32 RMT_EQUAL_RGB = 1;     // RGB colormap (R plane, G plane, B plane)
+const uint32 RMT_RAW = 2;           // Raw colormap data
+
+// RLE encoding flag
+const uint8 RLE_FLAG = 0x80;
+
+// =============================================================================
+// Sun Raster Header (32 bytes)
+// =============================================================================
+
+struct sunrast_header {
+    uint32 magic;           // Magic number (0x59a66a95)
+    uint32 width;           // Image width in pixels
+    uint32 height;          // Image height in pixels
+    uint32 depth;           // Bits per pixel (1, 8, 24, or 32)
+    uint32 length;          // Length of image data in bytes
+    uint32 type;            // Raster type (RT_* values)
+    uint32 colormap_type;   // Colormap type (RMT_* values)
+    uint32 colormap_length; // Colormap length in bytes
+};

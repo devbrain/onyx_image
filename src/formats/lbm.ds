@@ -1,0 +1,184 @@
+/**
+ * Amiga LBM/ILBM bitmap format (IFF).
+ *
+ * This schema defines the ILBM chunk payloads used by LBM/ILBM images.
+ */
+package formats.lbm;
+
+// IFF uses big-endian byte order by default.
+big;
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum uint8 masking_type {
+    MSK_NONE = 0,
+    MSK_HAS_MASK = 1,
+    MSK_HAS_TRANSPARENT_COLOR = 2,
+    MSK_LASSO = 3
+};
+
+enum uint8 compression_type {
+    CMP_NONE = 0,
+    CMP_BYTE_RUN = 1
+};
+
+enum uint16 drng_flags {
+    RNG_ACTIVE = 1,
+    RNG_DP_RESERVED = 4,
+    RNG_FADE = 8
+};
+
+enum int16 ccrt_direction {
+    CCRT_STOP = 0,
+    CCRT_LEFT = -1,
+    CCRT_RIGHT = 1
+};
+
+enum uint16 crng_active_flags {
+    CRNG_ACTIVE = 1,
+    CRNG_SHIFT_RIGHT = 2
+};
+
+enum int16 crng_rate {
+    CRNG_60_STEPS_PER_SECOND = 16384
+};
+
+// =============================================================================
+// Core Chunk Structures
+// =============================================================================
+
+struct bmhd {
+    big uint16 width;
+    big uint16 height;
+    big int16 x_origin;
+    big int16 y_origin;
+    uint8 num_planes;
+    masking_type masking;
+    compression_type compression;
+    uint8 pad1;
+    big uint16 transparent_color;
+    uint8 x_aspect;
+    uint8 y_aspect;
+    big uint16 page_width;
+    big uint16 page_height;
+};
+
+struct grab {
+    big int16 x;
+    big int16 y;
+};
+
+struct dest_merge {
+    uint8 depth;
+    uint8 pad1;
+    big uint16 plane_pick;
+    big uint16 plane_on_off;
+    big uint16 plane_mask;
+};
+
+struct sprite_info {
+    big uint16 sprite_precedence;
+};
+
+struct viewport_mode {
+    big int32 mode;
+};
+
+struct dpi_header {
+    big uint16 dpi_x;
+    big uint16 dpi_y;
+};
+
+// =============================================================================
+// Color Map Chunks
+// =============================================================================
+
+struct color_register {
+    uint8 red;
+    uint8 green;
+    uint8 blue;
+};
+
+struct color_map(uint32 chunk_size) {
+    color_register colors[chunk_size / 3];
+};
+
+struct cmyk_register {
+    uint8 cyan;
+    uint8 magenta;
+    uint8 yellow;
+    uint8 black;
+};
+
+struct cmyk_map(uint32 chunk_size) {
+    cmyk_register colors[chunk_size / 4];
+};
+
+struct color_names {
+    big uint16 starting_color;
+    big uint16 ending_color;
+    string names[ending_color - starting_color + 1];
+};
+
+// =============================================================================
+// Color Cycling Chunks
+// =============================================================================
+
+struct color_range {
+    big int16 pad1;
+    big int16 rate;
+    big int16 active;
+    uint8 low;
+    uint8 high;
+};
+
+struct cycle_info {
+    big int16 direction;
+    uint8 start;
+    uint8 end;
+    big int32 seconds;
+    big int32 microseconds;
+    big int16 pad;
+};
+
+struct dcolor {
+    uint8 cell;
+    uint8 r;
+    uint8 g;
+    uint8 b;
+};
+
+struct dindex {
+    uint8 cell;
+    uint8 index;
+};
+
+struct dfade {
+    uint8 cell;
+    uint8 fade;
+};
+
+struct drange_header {
+    uint8 min;
+    uint8 max;
+    big int16 rate;
+    big int16 flags;
+    uint8 ntrue;
+    uint8 nregs;
+};
+
+struct drange(uint32 chunk_size) {
+    uint8 min;
+    uint8 max;
+    big int16 rate;
+    big int16 flags;
+    uint8 ntrue;
+    uint8 nregs;
+    dcolor dcolors[ntrue];
+    dindex dindexes[nregs];
+    uint8 nfades if chunk_size > (8 + ntrue * 4 + nregs * 2);
+    uint8 pad if chunk_size > (9 + ntrue * 4 + nregs * 2);
+    dfade dfades[nfades] if chunk_size > (10 + ntrue * 4 + nregs * 2);
+};

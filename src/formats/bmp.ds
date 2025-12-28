@@ -1,0 +1,232 @@
+/**
+ * BMP (Windows Bitmap) Image Format
+ *
+ * Supports Windows and OS/2 bitmap formats with various header versions.
+ *
+ * References:
+ * - Microsoft Windows Bitmap File Format
+ * - OS/2 Bitmap File Format
+ */
+package formats.bmp;
+
+// BMP files use little-endian byte order
+little;
+
+// Compression methods
+const uint32 BI_RGB = 0;            // Uncompressed
+const uint32 BI_RLE8 = 1;           // 8-bit RLE
+const uint32 BI_RLE4 = 2;           // 4-bit RLE
+const uint32 BI_BITFIELDS = 3;      // Bitfield masks
+const uint32 BI_JPEG = 4;           // JPEG compression
+const uint32 BI_PNG = 5;            // PNG compression
+
+// Header sizes
+const uint32 BITMAPCOREHEADER_SIZE = 12;      // OS/2 1.x
+const uint32 BITMAPINFOHEADER_SIZE = 40;      // Windows 3.x
+const uint32 BITMAPV2INFOHEADER_SIZE = 52;    // Undocumented
+const uint32 BITMAPV3INFOHEADER_SIZE = 56;    // Undocumented
+const uint32 OS2_V2_HEADER_SIZE = 64;         // OS/2 2.x
+const uint32 BITMAPV4HEADER_SIZE = 108;       // Windows 95/NT4
+const uint32 BITMAPV5HEADER_SIZE = 124;       // Windows 98/2000
+
+// =============================================================================
+// BMP File Header (14 bytes)
+// =============================================================================
+
+struct bmp_file_header {
+    uint8 magic[2];          // "BM" for Windows, "BA", "CI", "CP", "IC", "PT" for OS/2
+    uint32 file_size;        // Size of the file in bytes
+    uint16 reserved1;        // Reserved, should be 0
+    uint16 reserved2;        // Reserved, should be 0
+    uint32 data_offset;      // Offset to pixel data from start of file
+};
+
+// =============================================================================
+// OS/2 1.x Core Header (12 bytes)
+// =============================================================================
+
+struct bmp_core_header {
+    uint32 header_size;      // Size of this header (12)
+    int16 width;             // Image width
+    int16 height;            // Image height
+    uint16 planes;           // Number of planes (must be 1)
+    uint16 bits_per_pixel;   // Bits per pixel (1, 4, 8, 24)
+};
+
+// =============================================================================
+// Windows BITMAPINFOHEADER (40 bytes)
+// =============================================================================
+
+struct bmp_info_header {
+    uint32 header_size;      // Size of this header (40)
+    int32 width;             // Image width
+    int32 height;            // Image height (negative = top-down)
+    uint16 planes;           // Number of planes (must be 1)
+    uint16 bits_per_pixel;   // Bits per pixel (1, 4, 8, 16, 24, 32)
+    uint32 compression;      // Compression method
+    uint32 image_size;       // Size of image data (may be 0 for BI_RGB)
+    int32 x_pixels_per_meter;
+    int32 y_pixels_per_meter;
+    uint32 colors_used;      // Number of colors in palette (0 = default)
+    uint32 colors_important; // Number of important colors (0 = all)
+};
+
+// =============================================================================
+// BITMAPV2INFOHEADER (52 bytes) - adds RGB masks
+// =============================================================================
+
+struct bmp_v2_header {
+    uint32 header_size;
+    int32 width;
+    int32 height;
+    uint16 planes;
+    uint16 bits_per_pixel;
+    uint32 compression;
+    uint32 image_size;
+    int32 x_pixels_per_meter;
+    int32 y_pixels_per_meter;
+    uint32 colors_used;
+    uint32 colors_important;
+    uint32 red_mask;
+    uint32 green_mask;
+    uint32 blue_mask;
+};
+
+// =============================================================================
+// BITMAPV3INFOHEADER (56 bytes) - adds alpha mask
+// =============================================================================
+
+struct bmp_v3_header {
+    uint32 header_size;
+    int32 width;
+    int32 height;
+    uint16 planes;
+    uint16 bits_per_pixel;
+    uint32 compression;
+    uint32 image_size;
+    int32 x_pixels_per_meter;
+    int32 y_pixels_per_meter;
+    uint32 colors_used;
+    uint32 colors_important;
+    uint32 red_mask;
+    uint32 green_mask;
+    uint32 blue_mask;
+    uint32 alpha_mask;
+};
+
+// =============================================================================
+// OS/2 2.x Header (64 bytes)
+// =============================================================================
+
+struct bmp_os2_v2_header {
+    uint32 header_size;
+    uint32 width;
+    uint32 height;
+    uint16 planes;
+    uint16 bits_per_pixel;
+    uint32 compression;
+    uint32 image_size;
+    uint32 x_resolution;
+    uint32 y_resolution;
+    uint32 colors_used;
+    uint32 colors_important;
+    uint16 units;
+    uint16 reserved;
+    uint16 recording;
+    uint16 rendering;
+    uint32 size1;
+    uint32 size2;
+    uint32 color_encoding;
+    uint32 identifier;
+};
+
+// =============================================================================
+// CIEXYZ Color Space (12 bytes)
+// =============================================================================
+
+struct ciexyz {
+    int32 x;   // Fixed point 2.30
+    int32 y;
+    int32 z;
+};
+
+struct ciexyz_triple {
+    ciexyz red;
+    ciexyz green;
+    ciexyz blue;
+};
+
+// =============================================================================
+// BITMAPV4HEADER (108 bytes)
+// =============================================================================
+
+struct bmp_v4_header {
+    uint32 header_size;
+    int32 width;
+    int32 height;
+    uint16 planes;
+    uint16 bits_per_pixel;
+    uint32 compression;
+    uint32 image_size;
+    int32 x_pixels_per_meter;
+    int32 y_pixels_per_meter;
+    uint32 colors_used;
+    uint32 colors_important;
+    uint32 red_mask;
+    uint32 green_mask;
+    uint32 blue_mask;
+    uint32 alpha_mask;
+    uint32 cs_type;
+    ciexyz_triple endpoints;
+    uint32 gamma_red;
+    uint32 gamma_green;
+    uint32 gamma_blue;
+};
+
+// =============================================================================
+// BITMAPV5HEADER (124 bytes)
+// =============================================================================
+
+struct bmp_v5_header {
+    uint32 header_size;
+    int32 width;
+    int32 height;
+    uint16 planes;
+    uint16 bits_per_pixel;
+    uint32 compression;
+    uint32 image_size;
+    int32 x_pixels_per_meter;
+    int32 y_pixels_per_meter;
+    uint32 colors_used;
+    uint32 colors_important;
+    uint32 red_mask;
+    uint32 green_mask;
+    uint32 blue_mask;
+    uint32 alpha_mask;
+    uint32 cs_type;
+    ciexyz_triple endpoints;
+    uint32 gamma_red;
+    uint32 gamma_green;
+    uint32 gamma_blue;
+    uint32 intent;
+    uint32 profile_data;
+    uint32 profile_size;
+    uint32 reserved;
+};
+
+// =============================================================================
+// Palette Entry
+// =============================================================================
+
+struct rgb_triple {
+    uint8 blue;
+    uint8 green;
+    uint8 red;
+};
+
+struct rgb_quad {
+    uint8 blue;
+    uint8 green;
+    uint8 red;
+    uint8 reserved;
+};

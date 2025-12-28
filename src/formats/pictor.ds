@@ -1,0 +1,51 @@
+/**
+ * PICTOR/PC Paint PIC Image Format
+ *
+ * Originally developed by John Googhan for Pictor (PC Paint).
+ * Uses RLE compression with block-based encoding.
+ *
+ * References:
+ * - Encyclopedia of Graphics File Formats (EGFF)
+ * - https://www.fileformat.info/format/pictor/egff.htm
+ */
+package formats.pictor;
+
+// PICTOR files use little-endian byte order
+little;
+
+// Magic number
+const uint16 PICTOR_MAGIC = 0x1234;
+
+// Palette types
+const uint16 PAL_NONE = 0;          // No palette
+const uint16 PAL_CGA = 1;           // CGA palette + border (2 bytes)
+const uint16 PAL_PCJR = 2;          // PC Jr/16-color palette (16 bytes)
+const uint16 PAL_EGA = 3;           // EGA palette (16 bytes)
+const uint16 PAL_VGA = 4;           // VGA palette (768 bytes)
+
+// =============================================================================
+// PICTOR File Header (17 bytes)
+// =============================================================================
+
+struct pictor_header {
+    uint16 magic;           // Magic number (0x1234)
+    uint16 width;           // Image width in pixels
+    uint16 height;          // Image height in pixels
+    uint16 x_offset;        // X position, lower-left corner
+    uint16 y_offset;        // Y position, lower-left corner
+    uint8 plane_info;       // Bits per pixel (0-3) and planes (4-7)
+    uint8 palette_flag;     // 0xFF = version 2.0+ with palette data
+    uint8 video_mode;       // Display mode character
+    uint16 palette_type;    // Palette format type
+    uint16 palette_size;    // Palette data size in bytes
+};
+
+// =============================================================================
+// RLE Block Header (5 bytes)
+// =============================================================================
+
+struct pictor_rle_block {
+    uint16 block_size;      // Entire block size including header
+    uint16 run_length;      // Total decoded pixels in block
+    uint8 run_marker;       // Escape character for runs
+};

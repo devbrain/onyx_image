@@ -1,0 +1,92 @@
+/**
+ * MSP (Microsoft Paint) Image Format
+ *
+ * Native file format of Microsoft Paint for Windows 1.x and 2.x.
+ * Supports only monochrome (1-bit) images.
+ *
+ * Version 1: Uncompressed bitmap data
+ * Version 2: RLE-compressed with scan-line map
+ *
+ * References:
+ * - Encyclopedia of Graphics File Formats (EGFF)
+ * - FileFormats Archive Team Wiki
+ */
+package formats.msp;
+
+// MSP files use little-endian byte order
+little;
+
+// Version 1.x magic: "DanM" (developer initials)
+const uint16 MSP_V1_KEY1 = 0x6144;
+const uint16 MSP_V1_KEY2 = 0x4D6E;
+
+// Version 2.x magic: "LinS" (developer initials)
+const uint16 MSP_V2_KEY1 = 0x694C;
+const uint16 MSP_V2_KEY2 = 0x536E;
+
+// Header size in bytes
+const uint32 MSP_HEADER_SIZE = 32;
+
+// =============================================================================
+// MSP Header (32 bytes)
+// =============================================================================
+
+/**
+ * MSP File Header
+ *
+ * The header is always 32 bytes and contains image metadata.
+ * The checksum is computed by XORing all 13 WORDs (26 bytes).
+ */
+struct msp_header {
+    uint16 key1;                // Magic number (first part)
+    uint16 key2;                // Magic number (second part)
+    uint16 width;               // Width of the bitmap in pixels
+    uint16 height;              // Height of the bitmap in pixels
+    uint16 xar_bitmap;          // X aspect ratio of the bitmap
+    uint16 yar_bitmap;          // Y aspect ratio of the bitmap
+    uint16 xar_printer;         // X aspect ratio of the printer
+    uint16 yar_printer;         // Y aspect ratio of the printer
+    uint16 printer_width;       // Width of the output device
+    uint16 printer_height;      // Height of the output device
+    uint16 x_aspect_corr;       // X aspect correction (unused, set to 0)
+    uint16 y_aspect_corr;       // Y aspect correction (unused, set to 0)
+    uint16 checksum;            // XOR of first 12 WORDs
+    uint16 reserved[3];         // Reserved (padding to 32 bytes)
+};
+
+// =============================================================================
+// Usage Notes
+// =============================================================================
+
+/*
+ * MSP DECODING NOTES:
+ *
+ * Version detection:
+ *   - Version 1.x: key1 == 0x6144 && key2 == 0x4D6E ("DanM")
+ *   - Version 2.x: key1 == 0x694C && key2 == 0x536E ("LinS")
+ *
+ * Checksum validation:
+ *   - XOR all 13 16-bit words (26 bytes) including checksum
+ *   - Result should be 0 for valid file
+ *
+ * Image data:
+ *   - Monochrome only: 1 bit per pixel, 8 pixels per byte
+ *   - Row bytes = (width + 7) / 8
+ *   - Bit 1 = black, Bit 0 = white
+ *
+ * Version 1.x (Uncompressed):
+ *   - Bitmap data immediately follows header at offset 32
+ *   - Each row is row_bytes long
+ *
+ * Version 2.x (RLE Compressed):
+ *   - Scan-line map at offset 32: height * 2 bytes
+ *   - Each 16-bit entry = encoded byte count for that row
+ *   - Compressed data follows scan-line map
+ *
+ * RLE Algorithm (Version 2):
+ *   - Read RunType byte
+ *   - If RunType == 0: read RunCount byte, read RunValue byte,
+ *     output RunValue repeated RunCount times
+ *   - If RunType != 0: use RunType as literal count,
+ *     copy next RunType bytes directly
+ */
