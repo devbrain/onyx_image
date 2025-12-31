@@ -112,6 +112,9 @@ target_include_directories(onyx_image_stb PRIVATE
 )
 target_link_libraries(onyx_image_stb PRIVATE stb_image)
 target_compile_features(onyx_image_stb PRIVATE cxx_std_20)
+if (NEUTRINO_ONYX_IMAGE_BUILD_SHARED)
+    set_target_properties(onyx_image_stb PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
 # Disable warnings for stb_image wrapper (cross-platform)
 target_compile_options(onyx_image_stb PRIVATE
         $<$<CXX_COMPILER_ID:MSVC>:/W0>
@@ -161,4 +164,3 @@ target_link_libraries(onyx_image PRIVATE
         onyx_image_parsers
         lodepng
 )
-
