@@ -11,24 +11,6 @@ neutrino_fetch_mzexplode()
 include(${NEUTRINO_CMAKE_DIR}/deps/datascript.cmake)
 neutrino_fetch_datascript()
 
-# lodepng - PNG encoder/decoder (single-file library)
-FetchContent_Declare(lodepng
-        GIT_REPOSITORY https://github.com/lvandeve/lodepng.git
-        GIT_TAG master
-        GIT_SHALLOW TRUE
-        DOWNLOAD_ONLY YES
-)
-FetchContent_MakeAvailable(lodepng)
-
-add_library(lodepng STATIC ${lodepng_SOURCE_DIR}/lodepng.cpp)
-target_include_directories(lodepng PUBLIC $<BUILD_INTERFACE:${lodepng_SOURCE_DIR}>)
-# Disable warnings for third-party library (cross-platform)
-target_compile_options(lodepng PRIVATE
-        $<$<CXX_COMPILER_ID:MSVC>:/W0>
-        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
-)
-set_target_properties(lodepng PROPERTIES POSITION_INDEPENDENT_CODE ON)
-
 # stb - single-file public domain libraries
 FetchContent_Declare(stb
         GIT_REPOSITORY https://github.com/nothings/stb.git
@@ -122,6 +104,25 @@ target_compile_options(onyx_image_stb PRIVATE
 )
 
 # ============================================================================
+# LodePNG (embedded single-file PNG library)
+# ============================================================================
+
+# Create separate object library for lodepng to isolate warning suppression
+add_library(onyx_image_lodepng OBJECT thirdparty/lodepng/lodepng.cpp)
+target_include_directories(onyx_image_lodepng PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/lodepng>
+)
+target_compile_features(onyx_image_lodepng PRIVATE cxx_std_20)
+if (NEUTRINO_ONYX_IMAGE_BUILD_SHARED)
+    set_target_properties(onyx_image_lodepng PROPERTIES POSITION_INDEPENDENT_CODE ON)
+endif ()
+# Disable warnings for lodepng (cross-platform)
+target_compile_options(onyx_image_lodepng PRIVATE
+        $<$<CXX_COMPILER_ID:MSVC>:/W0>
+        $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+)
+
+# ============================================================================
 # Library Sources
 # ============================================================================
 
@@ -134,6 +135,7 @@ target_sources(onyx_image PRIVATE
         codecs/png.cpp
         codecs/lbm.cpp
         $<TARGET_OBJECTS:onyx_image_stb>
+        $<TARGET_OBJECTS:onyx_image_lodepng>
         codecs/bmp.cpp
         codecs/sunrast.cpp
         codecs/pictor.cpp
@@ -158,9 +160,9 @@ target_sources(onyx_image PRIVATE
 
 target_include_directories(onyx_image PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}
+        ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/lodepng
 )
 
 target_link_libraries(onyx_image PRIVATE
         onyx_image_parsers
-        lodepng
 )
