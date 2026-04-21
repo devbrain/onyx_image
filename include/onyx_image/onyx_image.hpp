@@ -22,6 +22,7 @@
 #include <onyx_image/codecs/atarist.hpp>
 #include <onyx_image/codecs/qoi.hpp>
 #include <onyx_image/codecs/ico.hpp>
+#include <onyx_image/codecs/xpm.hpp>
 #include <onyx_image/codecs/koala.hpp>
 #include <onyx_image/codecs/c64_doodle.hpp>
 #include <onyx_image/codecs/drazlace.hpp>

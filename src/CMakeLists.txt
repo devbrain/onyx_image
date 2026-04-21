@@ -146,6 +146,7 @@ target_sources(onyx_image PRIVATE
         codecs/atarist.cpp
         codecs/qoi.cpp
         codecs/ico.cpp
+        codecs/xpm.cpp
         codecs/koala.cpp
         codecs/c64_doodle.cpp
         codecs/drazlace.cpp

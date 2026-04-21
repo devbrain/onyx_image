@@ -24,6 +24,7 @@ A modern C++20 library for decoding retro and vintage image formats, with a focu
 | TGA | `.tga`, `.targa` | Truevision TGA |
 | PCX | `.pcx` | ZSoft Paintbrush |
 | QOI | `.qoi` | Quite OK Image Format |
+| XPM | `.xpm` | X PixMap |
 
 ### Retro PC Formats
 | Format | Extensions | Description |

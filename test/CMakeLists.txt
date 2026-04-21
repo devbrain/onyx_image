@@ -23,6 +23,7 @@ add_executable(onyx_image_tests
     test_funpaint_decoder.cpp
     test_c64_hires_decoder.cpp
     test_runpaint_decoder.cpp
+    test_xpm_decoder.cpp
     helpers/md5.c
 )
 

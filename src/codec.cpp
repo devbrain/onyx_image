@@ -15,6 +15,7 @@
 #include <onyx_image/codecs/atarist.hpp>
 #include <onyx_image/codecs/qoi.hpp>
 #include <onyx_image/codecs/ico.hpp>
+#include <onyx_image/codecs/xpm.hpp>
 #include <onyx_image/codecs/koala.hpp>
 #include <onyx_image/codecs/c64_doodle.hpp>
 #include <onyx_image/codecs/drazlace.hpp>
@@ -517,6 +518,27 @@ public:
     }
 };
 
+class xpm_decoder_impl : public decoder {
+public:
+    [[nodiscard]] std::string_view name() const noexcept override {
+        return xpm_decoder::name;
+    }
+
+    [[nodiscard]] std::span<const std::string_view> extensions() const noexcept override {
+        return xpm_decoder::extensions;
+    }
+
+    [[nodiscard]] bool sniff(std::span<const std::uint8_t> data) const noexcept override {
+        return xpm_decoder::sniff(data);
+    }
+
+    [[nodiscard]] decode_result decode(std::span<const std::uint8_t> data,
+                                        surface& surf,
+                                        const decode_options& options) const override {
+        return xpm_decoder::decode(data, surf, options);
+    }
+};
+
 class koala_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -726,6 +748,7 @@ void codec_registry::register_builtin_codecs() {
     decoders_.push_back(std::make_unique<qoi_decoder_impl>());
     decoders_.push_back(std::make_unique<ico_decoder_impl>());
     decoders_.push_back(std::make_unique<exe_icon_decoder_impl>());
+    decoders_.push_back(std::make_unique<xpm_decoder_impl>());
     decoders_.push_back(std::make_unique<c64_doodle_decoder_impl>());
     decoders_.push_back(std::make_unique<runpaint_decoder_impl>());
     decoders_.push_back(std::make_unique<interpaint_decoder_impl>());
