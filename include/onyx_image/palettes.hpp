@@ -1,6 +1,7 @@
 #ifndef ONYX_IMAGE_PALETTES_HPP_
 #define ONYX_IMAGE_PALETTES_HPP_
 
+#include <cstddef>
 #include <onyx_image/onyx_image_export.h>
 
 #include <array>

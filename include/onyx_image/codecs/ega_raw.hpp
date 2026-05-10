@@ -1,6 +1,7 @@
 #ifndef ONYX_IMAGE_CODECS_EGA_RAW_HPP_
 #define ONYX_IMAGE_CODECS_EGA_RAW_HPP_
 
+#include <cstddef>
 #include <onyx_image/onyx_image_export.h>
 #include <onyx_image/types.hpp>
 #include <onyx_image/surface.hpp>

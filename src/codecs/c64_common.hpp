@@ -1,6 +1,7 @@
 #ifndef ONYX_IMAGE_CODECS_C64_COMMON_HPP_
 #define ONYX_IMAGE_CODECS_C64_COMMON_HPP_
 
+#include <cstddef>
 #include <onyx_image/surface.hpp>
 
 #include <array>
