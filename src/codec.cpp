@@ -1,29 +1,80 @@
 #include <onyx_image/codec.hpp>
+
+// Per-codec headers are guarded by ONYX_IMAGE_HAS_<NAME> compile defs
+// set in src/CMakeLists.txt. Disabled codecs have their .cpp omitted
+// from the build, so this TU must also omit the corresponding _impl
+// class and registration to avoid undefined references at link.
+#if defined(ONYX_IMAGE_HAS_PCX)
 #include <onyx_image/codecs/pcx.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_PNG)
 #include <onyx_image/codecs/png.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_LBM)
 #include <onyx_image/codecs/lbm.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_STB)
 #include <onyx_image/codecs/jpeg.hpp>
 #include <onyx_image/codecs/tga.hpp>
 #include <onyx_image/codecs/gif.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_BMP)
 #include <onyx_image/codecs/bmp.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_SUNRAST)
 #include <onyx_image/codecs/sunrast.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_PICTOR)
 #include <onyx_image/codecs/pictor.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_SGI)
 #include <onyx_image/codecs/sgi.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_PNM)
 #include <onyx_image/codecs/pnm.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_DCX)
 #include <onyx_image/codecs/dcx.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_MSP)
 #include <onyx_image/codecs/msp.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 #include <onyx_image/codecs/atarist.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_QOI)
 #include <onyx_image/codecs/qoi.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_ICO)
 #include <onyx_image/codecs/ico.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_XPM)
 #include <onyx_image/codecs/xpm.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_KOALA)
 #include <onyx_image/codecs/koala.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_C64_DOODLE)
 #include <onyx_image/codecs/c64_doodle.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_DRAZLACE)
 #include <onyx_image/codecs/drazlace.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_INTERPAINT)
 #include <onyx_image/codecs/interpaint.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_AMI)
 #include <onyx_image/codecs/ami.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_FUNPAINT)
 #include <onyx_image/codecs/funpaint.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_C64_HIRES)
 #include <onyx_image/codecs/c64_hires.hpp>
+#endif
+#if defined(ONYX_IMAGE_HAS_RUNPAINT)
 #include <onyx_image/codecs/runpaint.hpp>
+#endif
 
 #include <algorithm>
 
@@ -35,6 +86,7 @@ namespace onyx_image {
 
 namespace {
 
+#if defined(ONYX_IMAGE_HAS_PCX)
 class pcx_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -55,7 +107,9 @@ public:
         return pcx_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_PNG)
 class png_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -76,7 +130,9 @@ public:
         return png_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_LBM)
 class lbm_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -97,7 +153,9 @@ public:
         return lbm_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_STB)
 class jpeg_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -118,7 +176,9 @@ public:
         return jpeg_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_STB)
 class tga_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -139,7 +199,9 @@ public:
         return tga_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_STB)
 class gif_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -160,7 +222,9 @@ public:
         return gif_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_BMP)
 class bmp_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -181,7 +245,9 @@ public:
         return bmp_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_SUNRAST)
 class sunrast_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -202,7 +268,9 @@ public:
         return sunrast_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_PICTOR)
 class pictor_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -223,7 +291,9 @@ public:
         return pictor_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_SGI)
 class sgi_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -244,7 +314,9 @@ public:
         return sgi_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_PNM)
 class pnm_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -265,7 +337,9 @@ public:
         return pnm_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_DCX)
 class dcx_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -286,7 +360,9 @@ public:
         return dcx_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_MSP)
 class msp_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -307,7 +383,9 @@ public:
         return msp_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class neo_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -328,7 +406,9 @@ public:
         return neo_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class degas_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -349,7 +429,9 @@ public:
         return degas_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class doodle_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -370,7 +452,9 @@ public:
         return doodle_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class crack_art_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -391,7 +475,9 @@ public:
         return crack_art_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class tiny_stuff_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -412,7 +498,9 @@ public:
         return tiny_stuff_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class spectrum512_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -433,7 +521,9 @@ public:
         return spectrum512_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ATARIST)
 class photochrome_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -454,7 +544,9 @@ public:
         return photochrome_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_QOI)
 class qoi_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -475,7 +567,9 @@ public:
         return qoi_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ICO)
 class ico_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -496,7 +590,9 @@ public:
         return ico_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_ICO)
 class exe_icon_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -517,7 +613,9 @@ public:
         return exe_icon_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_XPM)
 class xpm_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -538,7 +636,9 @@ public:
         return xpm_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_KOALA)
 class koala_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -559,7 +659,9 @@ public:
         return koala_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_C64_DOODLE)
 class c64_doodle_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -580,7 +682,9 @@ public:
         return c64_doodle_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_DRAZLACE)
 class drazlace_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -601,7 +705,9 @@ public:
         return drazlace_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_INTERPAINT)
 class interpaint_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -622,7 +728,9 @@ public:
         return interpaint_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_AMI)
 class ami_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -643,7 +751,9 @@ public:
         return ami_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_FUNPAINT)
 class funpaint_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -664,7 +774,9 @@ public:
         return funpaint_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_C64_HIRES)
 class c64_hires_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -685,7 +797,9 @@ public:
         return c64_hires_decoder::decode(data, surf, options);
     }
 };
+#endif
 
+#if defined(ONYX_IMAGE_HAS_RUNPAINT)
 class runpaint_decoder_impl : public decoder {
 public:
     [[nodiscard]] std::string_view name() const noexcept override {
@@ -706,6 +820,7 @@ public:
         return runpaint_decoder::decode(data, surf, options);
     }
 };
+#endif
 
 } // namespace
 
@@ -725,38 +840,102 @@ codec_registry::codec_registry() {
 codec_registry::~codec_registry() = default;
 
 void codec_registry::register_builtin_codecs() {
+#if defined(ONYX_IMAGE_HAS_PCX)
     decoders_.push_back(std::make_unique<pcx_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_PNG)
     decoders_.push_back(std::make_unique<png_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_LBM)
     decoders_.push_back(std::make_unique<lbm_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_STB)
     decoders_.push_back(std::make_unique<jpeg_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_STB)
     decoders_.push_back(std::make_unique<tga_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_STB)
     decoders_.push_back(std::make_unique<gif_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_BMP)
     decoders_.push_back(std::make_unique<bmp_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_SUNRAST)
     decoders_.push_back(std::make_unique<sunrast_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_PICTOR)
     decoders_.push_back(std::make_unique<pictor_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_SGI)
     decoders_.push_back(std::make_unique<sgi_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_PNM)
     decoders_.push_back(std::make_unique<pnm_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_DCX)
     decoders_.push_back(std::make_unique<dcx_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_MSP)
     decoders_.push_back(std::make_unique<msp_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<neo_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<degas_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<crack_art_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<spectrum512_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<photochrome_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<tiny_stuff_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ATARIST)
     decoders_.push_back(std::make_unique<doodle_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_QOI)
     decoders_.push_back(std::make_unique<qoi_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ICO)
     decoders_.push_back(std::make_unique<ico_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_ICO)
     decoders_.push_back(std::make_unique<exe_icon_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_XPM)
     decoders_.push_back(std::make_unique<xpm_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_C64_DOODLE)
     decoders_.push_back(std::make_unique<c64_doodle_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_RUNPAINT)
     decoders_.push_back(std::make_unique<runpaint_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_INTERPAINT)
     decoders_.push_back(std::make_unique<interpaint_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_AMI)
     decoders_.push_back(std::make_unique<ami_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_FUNPAINT)
     decoders_.push_back(std::make_unique<funpaint_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_C64_HIRES)
     decoders_.push_back(std::make_unique<c64_hires_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_KOALA)
     decoders_.push_back(std::make_unique<koala_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_DRAZLACE)
     decoders_.push_back(std::make_unique<drazlace_decoder_impl>());
+#endif
 }
 
 void codec_registry::register_decoder(std::unique_ptr<decoder> dec) {
