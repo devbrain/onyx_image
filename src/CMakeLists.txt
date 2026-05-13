@@ -199,8 +199,16 @@ endforeach ()
 # STB wrapper (jpeg/tga/gif) and lodepng (png) are object libs with
 # their own warning suppression; only linked into onyx_image when their
 # corresponding codec axis is enabled.
+#
+# The matching ONYX_IMAGE_HAS_<CODEC>=1 compile definitions gate the
+# codec registration blocks in codec.cpp. PNG already gets its define
+# via the foreach loop above (PNG is in the per-codec list), but STB is
+# NOT in that list — without explicitly adding the define here, the
+# JPEG/TGA/GIF decoders in codec.cpp stay #ifdef'd out, so decode()
+# returns "Unknown image format" even though stb_image is linked in.
 if (NEUTRINO_ONYX_IMAGE_CODEC_STB)
     target_sources(onyx_image PRIVATE $<TARGET_OBJECTS:onyx_image_stb>)
+    target_compile_definitions(onyx_image PRIVATE ONYX_IMAGE_HAS_STB=1)
 endif ()
 if (NEUTRINO_ONYX_IMAGE_CODEC_PNG)
     target_sources(onyx_image PRIVATE $<TARGET_OBJECTS:onyx_image_lodepng>)
