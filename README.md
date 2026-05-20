@@ -20,6 +20,7 @@ A modern C++20 library for decoding retro and vintage image formats, with a focu
 | PNG | `.png` | Portable Network Graphics |
 | JPEG | `.jpg`, `.jpeg` | Joint Photographic Experts Group |
 | GIF | `.gif` | Graphics Interchange Format |
+| WebP | `.webp` | WebP Image Format |
 | BMP | `.bmp`, `.dib` | Windows/OS2 Bitmap |
 | TGA | `.tga`, `.targa` | Truevision TGA |
 | PCX | `.pcx` | ZSoft Paintbrush |

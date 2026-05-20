@@ -50,10 +50,12 @@ neutrino_define_library_options(onyx_image)
 # its source .cpp (src/codecs/<name>.cpp), the corresponding _impl
 # class + registration in codec.cpp (gated via ONYX_IMAGE_HAS_<NAME>
 # compile defs), and where applicable the datascript schema generation
-# and helper object libraries (lodepng for PNG, stb_image for STB).
+# and helper object libraries (lodepng for PNG, stb_image for STB,
+# tiny-webp for WEBP).
 #
 # Bundled-codec axes:
 #   STB     — JPEG, TGA, GIF (single stb.cpp wrapper)
+#   WEBP    — WebP via tiny-webp (single webp.cpp wrapper)
 #   ATARIST — neo, degas, doodle, crack_art, tiny_stuff,
 #             spectrum512, photochrome (single atarist.cpp)
 #   ICO     — ico + exe_icon (uses mzexplode's PE reader for exe_icon)
@@ -76,6 +78,9 @@ neutrino_option(NEUTRINO_ONYX_IMAGE_CODEC_BMP
     GROUP NEUTRINO_ONYX_IMAGE_CODEC_ALL)
 neutrino_option(NEUTRINO_ONYX_IMAGE_CODEC_STB
     "STB family — JPEG, TGA, GIF (bundled via stb_image)" ON
+    GROUP NEUTRINO_ONYX_IMAGE_CODEC_ALL)
+neutrino_option(NEUTRINO_ONYX_IMAGE_CODEC_WEBP
+    "WebP via tiny-webp" ON
     GROUP NEUTRINO_ONYX_IMAGE_CODEC_ALL)
 neutrino_option(NEUTRINO_ONYX_IMAGE_CODEC_QOI
     "QOI (Quite OK Image format)" ON

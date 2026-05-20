@@ -23,6 +23,18 @@ FetchContent_MakeAvailable(stb)
 add_library(stb_image INTERFACE)
 target_include_directories(stb_image INTERFACE $<BUILD_INTERFACE:${stb_SOURCE_DIR}>)
 
+# tiny-webp - single-header BSD-3-Clause WebP decoder
+FetchContent_Declare(tiny_webp
+        GIT_REPOSITORY https://github.com/justus2510/tiny-webp.git
+        GIT_TAG f1c2ddb4dde6749ea688fa4f1832aaa84036c247
+        GIT_SHALLOW TRUE
+        DOWNLOAD_ONLY YES
+)
+FetchContent_MakeAvailable(tiny_webp)
+
+add_library(tiny_webp INTERFACE)
+target_include_directories(tiny_webp INTERFACE $<BUILD_INTERFACE:${tiny_webp_SOURCE_DIR}>)
+
 # ============================================================================
 # Library Target
 # ============================================================================
@@ -128,6 +140,29 @@ if (NEUTRINO_ONYX_IMAGE_CODEC_STB)
 endif ()
 
 # ============================================================================
+# tiny-webp Wrapper (compiled with warnings disabled)
+# ============================================================================
+# Built only when CODEC_WEBP is enabled — wraps WebP decode via tiny_webp.h.
+
+if (NEUTRINO_ONYX_IMAGE_CODEC_WEBP)
+    add_library(onyx_image_tiny_webp OBJECT codecs/webp.cpp)
+    target_include_directories(onyx_image_tiny_webp PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}
+            $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/include>
+    )
+    target_link_libraries(onyx_image_tiny_webp PRIVATE tiny_webp)
+    target_compile_features(onyx_image_tiny_webp PRIVATE cxx_std_20)
+    if (NEUTRINO_ONYX_IMAGE_BUILD_SHARED)
+        set_target_properties(onyx_image_tiny_webp PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif ()
+    target_compile_options(onyx_image_tiny_webp PRIVATE
+            $<$<CXX_COMPILER_ID:MSVC>:/W0>
+            $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-w>
+    )
+endif ()
+
+# ============================================================================
 # LodePNG (embedded single-file PNG library)
 # ============================================================================
 # Built only when CODEC_PNG is enabled — png.cpp delegates the actual
@@ -197,8 +232,9 @@ foreach (_codec_pair IN ITEMS
 endforeach ()
 
 # STB wrapper (jpeg/tga/gif) and lodepng (png) are object libs with
-# their own warning suppression; only linked into onyx_image when their
-# corresponding codec axis is enabled.
+# their own warning suppression; tiny-webp follows the same pattern.
+# These are only linked into onyx_image when their corresponding codec
+# axis is enabled.
 #
 # The matching ONYX_IMAGE_HAS_<CODEC>=1 compile definitions gate the
 # codec registration blocks in codec.cpp. PNG already gets its define
@@ -209,6 +245,10 @@ endforeach ()
 if (NEUTRINO_ONYX_IMAGE_CODEC_STB)
     target_sources(onyx_image PRIVATE $<TARGET_OBJECTS:onyx_image_stb>)
     target_compile_definitions(onyx_image PRIVATE ONYX_IMAGE_HAS_STB=1)
+endif ()
+if (NEUTRINO_ONYX_IMAGE_CODEC_WEBP)
+    target_sources(onyx_image PRIVATE $<TARGET_OBJECTS:onyx_image_tiny_webp>)
+    target_compile_definitions(onyx_image PRIVATE ONYX_IMAGE_HAS_WEBP=1)
 endif ()
 if (NEUTRINO_ONYX_IMAGE_CODEC_PNG)
     target_sources(onyx_image PRIVATE $<TARGET_OBJECTS:onyx_image_lodepng>)

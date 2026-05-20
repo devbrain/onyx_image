@@ -12,6 +12,7 @@
 #include <onyx_image/codecs/jpeg.hpp>
 #include <onyx_image/codecs/tga.hpp>
 #include <onyx_image/codecs/gif.hpp>
+#include <onyx_image/codecs/webp.hpp>
 #include <onyx_image/codecs/bmp.hpp>
 #include <onyx_image/codecs/sunrast.hpp>
 #include <onyx_image/codecs/pictor.hpp>

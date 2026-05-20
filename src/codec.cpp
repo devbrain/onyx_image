@@ -18,6 +18,9 @@
 #include <onyx_image/codecs/tga.hpp>
 #include <onyx_image/codecs/gif.hpp>
 #endif
+#if defined(ONYX_IMAGE_HAS_WEBP)
+#include <onyx_image/codecs/webp.hpp>
+#endif
 #if defined(ONYX_IMAGE_HAS_BMP)
 #include <onyx_image/codecs/bmp.hpp>
 #endif
@@ -220,6 +223,29 @@ public:
                                         surface& surf,
                                         const decode_options& options) const override {
         return gif_decoder::decode(data, surf, options);
+    }
+};
+#endif
+
+#if defined(ONYX_IMAGE_HAS_WEBP)
+class webp_decoder_impl : public decoder {
+public:
+    [[nodiscard]] std::string_view name() const noexcept override {
+        return webp_decoder::name;
+    }
+
+    [[nodiscard]] std::span<const std::string_view> extensions() const noexcept override {
+        return webp_decoder::extensions;
+    }
+
+    [[nodiscard]] bool sniff(std::span<const std::uint8_t> data) const noexcept override {
+        return webp_decoder::sniff(data);
+    }
+
+    [[nodiscard]] decode_result decode(std::span<const std::uint8_t> data,
+                                        surface& surf,
+                                        const decode_options& options) const override {
+        return webp_decoder::decode(data, surf, options);
     }
 };
 #endif
@@ -857,6 +883,9 @@ void codec_registry::register_builtin_codecs() {
 #endif
 #if defined(ONYX_IMAGE_HAS_STB)
     decoders_.push_back(std::make_unique<gif_decoder_impl>());
+#endif
+#if defined(ONYX_IMAGE_HAS_WEBP)
+    decoders_.push_back(std::make_unique<webp_decoder_impl>());
 #endif
 #if defined(ONYX_IMAGE_HAS_BMP)
     decoders_.push_back(std::make_unique<bmp_decoder_impl>());
