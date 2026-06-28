@@ -419,24 +419,39 @@ decode_result doodle_decoder::decode(std::span<const std::uint8_t> data, surface
     if (!dim_result)
         return dim_result;
 
-    if (!surf.set_size(width, height, pixel_format::rgb888)) {
+    // Monochrome (2-colour) image: emit indexed8 + palette for source output.
+    const color_output out = options.output;
+    const pixel_format fmt = out == color_output::source ? pixel_format::indexed8
+                           : out == color_output::rgba   ? pixel_format::rgba8888
+                                                         : pixel_format::rgb888;
+    if (!surf.set_size(width, height, fmt)) {
         return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
+    }
+    if (out == color_output::source) {
+        const std::uint8_t pal[6] = {0xFF, 0xFF, 0xFF, 0x00, 0x00, 0x00}; // 0=white, 1=black
+        surf.set_palette_size(2);
+        surf.write_palette(0, std::span<const std::uint8_t>(pal, sizeof pal));
     }
 
     // Decode monochrome bitmap (1 bit per pixel, MSB first)
-    std::vector<std::uint8_t> row(static_cast<std::size_t>(width) * 3);
+    const int bpp = out == color_output::source ? 1 : out == color_output::rgba ? 4 : 3;
+    std::vector<std::uint8_t> row(static_cast<std::size_t>(width) * bpp);
     for (int y = 0; y < height; ++y) {
         const std::uint8_t* src = data.data() + static_cast<std::size_t>(y) * 80;
         for (int x = 0; x < width; ++x) {
             int byte_idx = x / 8;
             int bit_idx = 7 - (x % 8);
-            bool pixel = (src[byte_idx] >> bit_idx) & 1;
-            std::uint8_t color = pixel ? 0x00 : 0xFF;  // 1=black, 0=white
-            row[static_cast<std::size_t>(x) * 3 + 0] = color;
-            row[static_cast<std::size_t>(x) * 3 + 1] = color;
-            row[static_cast<std::size_t>(x) * 3 + 2] = color;
+            bool pixel = (src[byte_idx] >> bit_idx) & 1; // 1=black, 0=white
+            std::uint8_t* dst = row.data() + static_cast<std::size_t>(x) * bpp;
+            if (out == color_output::source) {
+                dst[0] = pixel ? 1 : 0;
+            } else {
+                std::uint8_t color = pixel ? 0x00 : 0xFF;
+                dst[0] = dst[1] = dst[2] = color;
+                if (out == color_output::rgba) dst[3] = 0xFF;
+            }
         }
-        surf.write_pixels(0, y, width * 3, row.data());
+        surf.write_pixels(0, y, width * bpp, row.data());
     }
 
     return decode_result::success();

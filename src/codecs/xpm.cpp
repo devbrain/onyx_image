@@ -613,6 +613,17 @@ decode_result xpm_decoder::decode(std::span<const std::uint8_t> data,
     color_map.reserve(static_cast<std::size_t>(header.colors));
     bool has_alpha = false;
 
+    // For indexed (source) output: an ordered palette and key->index map.
+    const bool indexable = static_cast<std::size_t>(header.colors) <= 256;
+    std::unordered_map<std::string, std::uint8_t, string_hash, string_equal> index_map;
+    std::vector<rgba_color> palette_colors;
+    bool partial_alpha = false;
+    int transparent_index = -1;
+    if (indexable) {
+        index_map.reserve(static_cast<std::size_t>(header.colors));
+        palette_colors.reserve(static_cast<std::size_t>(header.colors));
+    }
+
     for (std::size_t i = 0; i < static_cast<std::size_t>(header.colors); ++i) {
         const std::string& line = lines[colors_start + i];
         std::string key;
@@ -623,7 +634,48 @@ decode_result xpm_decoder::decode(std::span<const std::uint8_t> data,
         if (color.a < 255) {
             has_alpha = true;
         }
+        if (indexable) {
+            if (color.a > 0 && color.a < 255) partial_alpha = true;
+            if (color.a == 0 && transparent_index < 0) transparent_index = static_cast<int>(i);
+            index_map.emplace(key, static_cast<std::uint8_t>(i));
+            palette_colors.push_back(color);
+        }
         color_map.emplace(std::move(key), color);
+    }
+
+    // Source output: preserve the XPM color table as an indexed8 image when it
+    // has <=256 entries and no partial transparency (which indexed8 can't hold).
+    if (options.output == color_output::source && indexable && !partial_alpha) {
+        if (!surf.set_size(header.width, header.height, pixel_format::indexed8)) {
+            return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
+        }
+        std::vector<std::uint8_t> pal(palette_colors.size() * 3);
+        for (std::size_t i = 0; i < palette_colors.size(); ++i) {
+            pal[i * 3 + 0] = palette_colors[i].r;
+            pal[i * 3 + 1] = palette_colors[i].g;
+            pal[i * 3 + 2] = palette_colors[i].b;
+        }
+        surf.set_palette_size(static_cast<int>(palette_colors.size()));
+        surf.write_palette(0, pal);
+        if (transparent_index >= 0) surf.set_transparent_index(transparent_index);
+
+        std::vector<std::uint8_t> idx_row(width);
+        for (std::size_t y = 0; y < height; ++y) {
+            const std::string& line = lines[pixels_start + y];
+            if (line.size() < row_chars) {
+                return decode_result::failure(decode_error::truncated_data, "XPM pixel data truncated");
+            }
+            for (std::size_t x = 0; x < width; ++x) {
+                std::string_view key_view(line.data() + x * cpp, cpp);
+                auto it = index_map.find(key_view);
+                if (it == index_map.end()) {
+                    return decode_result::failure(decode_error::invalid_format, "Unknown XPM color key");
+                }
+                idx_row[x] = it->second;
+            }
+            surf.write_pixels(0, static_cast<int>(y), static_cast<int>(width), idx_row.data());
+        }
+        return decode_result::success();
     }
 
     pixel_format format = has_alpha ? pixel_format::rgba8888 : pixel_format::rgb888;

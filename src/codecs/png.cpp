@@ -79,6 +79,47 @@ decode_result png_decoder::decode(std::span<const std::uint8_t> data,
         // If IHDR validation fails, skip pre-check and let lodepng handle it
     }
 
+    // Preserve indexed (palette-type) PNGs as indexed8 when source output is
+    // requested. Non-palette PNGs fall through to the RGBA path below.
+    if (options.output == color_output::source) {
+        lodepng::State inspect;
+        unsigned iw = 0, ih = 0;
+        if (lodepng_inspect(&iw, &ih, &inspect, data.data(), data.size()) == 0 &&
+            inspect.info_png.color.colortype == LCT_PALETTE) {
+            lodepng::State state;
+            state.info_raw.colortype = LCT_PALETTE;  // request 8-bit indices out
+            state.info_raw.bitdepth = 8;
+            std::vector<std::uint8_t> idx;
+            unsigned w = 0, h = 0;
+            if (lodepng::decode(idx, w, h, state, data.data(), data.size()) == 0 &&
+                w <= static_cast<unsigned>(std::numeric_limits<int>::max()) &&
+                h <= static_cast<unsigned>(std::numeric_limits<int>::max())) {
+                const unsigned char* pal = state.info_png.color.palette;
+                const std::size_t pal_count = state.info_png.color.palettesize;
+                if (pal && pal_count > 0 &&
+                    surf.set_size(static_cast<int>(w), static_cast<int>(h), pixel_format::indexed8)) {
+                    std::vector<std::uint8_t> rgb(pal_count * 3);
+                    int transparent = -1;
+                    for (std::size_t i = 0; i < pal_count; ++i) {
+                        rgb[i * 3 + 0] = pal[i * 4 + 0];
+                        rgb[i * 3 + 1] = pal[i * 4 + 1];
+                        rgb[i * 3 + 2] = pal[i * 4 + 2];
+                        if (pal[i * 4 + 3] == 0 && transparent < 0) transparent = static_cast<int>(i);
+                    }
+                    surf.set_palette_size(static_cast<int>(pal_count));
+                    surf.write_palette(0, rgb);
+                    if (transparent >= 0) surf.set_transparent_index(transparent);
+                    for (unsigned y = 0; y < h; ++y) {
+                        surf.write_pixels(0, static_cast<int>(y), static_cast<int>(w),
+                                          &idx[static_cast<std::size_t>(y) * w]);
+                    }
+                    return decode_result::success();
+                }
+            }
+        }
+        // fall through to RGBA on any problem
+    }
+
     unsigned width = 0;
     unsigned height = 0;
     std::vector<std::uint8_t> pixels;
