@@ -73,7 +73,7 @@ void test_koala_decode_md5(
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::decode(data, surface);
+    auto result = onyx_image::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
     CHECK(surface.width() == 320);
@@ -192,8 +192,8 @@ TEST_CASE("Koala decoder: GG and KOA produce identical output") {
     onyx_image::memory_surface koa_surface;
     onyx_image::memory_surface gg_surface;
 
-    auto koa_result = onyx_image::decode(koa_data, koa_surface);
-    auto gg_result = onyx_image::decode(gg_data, gg_surface);
+    auto koa_result = onyx_image::decode(koa_data, koa_surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
+    auto gg_result = onyx_image::decode(gg_data, gg_surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(koa_result.ok);
     REQUIRE(gg_result.ok);

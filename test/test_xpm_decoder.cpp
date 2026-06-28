@@ -72,7 +72,7 @@ void test_xpm_decode_md5(const char* filename, const char* expected_md5, const c
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::decode(data, surface);
+    auto result = onyx_image::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
     REQUIRE(surface.width() > 0);

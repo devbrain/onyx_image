@@ -73,7 +73,7 @@ void test_c64_hires_decode_md5(
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::decode(data, surface);
+    auto result = onyx_image::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
     CHECK(surface.width() == 320);
@@ -192,7 +192,7 @@ TEST_CASE("C64 hires decoder: dimensions and format") {
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::c64_hires_decoder::decode(data, surface);
+    auto result = onyx_image::c64_hires_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
 
@@ -209,7 +209,7 @@ TEST_CASE("C64 hires decoder: error handling") {
     SUBCASE("Empty data") {
         std::vector<std::uint8_t> data;
         onyx_image::memory_surface surface;
-        auto result = onyx_image::c64_hires_decoder::decode(data, surface);
+        auto result = onyx_image::c64_hires_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 
@@ -218,7 +218,7 @@ TEST_CASE("C64 hires decoder: error handling") {
         data[0] = 0x00;
         data[1] = 0x20;
         onyx_image::memory_surface surface;
-        auto result = onyx_image::c64_hires_decoder::decode(data, surface);
+        auto result = onyx_image::c64_hires_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 

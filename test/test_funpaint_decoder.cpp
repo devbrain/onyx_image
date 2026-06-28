@@ -73,7 +73,7 @@ void test_funpaint_decode_md5(
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::decode(data, surface);
+    auto result = onyx_image::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
     CHECK(surface.width() == 296);
@@ -167,7 +167,7 @@ TEST_CASE("FunPaint decoder: dimensions and format") {
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::funpaint_decoder::decode(data, surface);
+    auto result = onyx_image::funpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
 
@@ -184,14 +184,14 @@ TEST_CASE("FunPaint decoder: error handling") {
     SUBCASE("Empty data") {
         std::vector<std::uint8_t> data;
         onyx_image::memory_surface surface;
-        auto result = onyx_image::funpaint_decoder::decode(data, surface);
+        auto result = onyx_image::funpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 
     SUBCASE("Truncated header") {
         std::vector<std::uint8_t> data(10, 0);
         onyx_image::memory_surface surface;
-        auto result = onyx_image::funpaint_decoder::decode(data, surface);
+        auto result = onyx_image::funpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 
@@ -201,7 +201,7 @@ TEST_CASE("FunPaint decoder: error handling") {
         data[1] = 0x3f;
         std::memcpy(data.data() + 2, "NOTFUNPAINT!!!", 14);
         onyx_image::memory_surface surface;
-        auto result = onyx_image::funpaint_decoder::decode(data, surface);
+        auto result = onyx_image::funpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 

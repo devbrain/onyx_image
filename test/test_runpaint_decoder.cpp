@@ -73,7 +73,7 @@ void test_runpaint_decode_md5(
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::decode(data, surface);
+    auto result = onyx_image::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
     CHECK(surface.width() == 320);
@@ -174,7 +174,7 @@ TEST_CASE("Run Paint decoder: dimensions and format") {
     REQUIRE(!data.empty());
 
     onyx_image::memory_surface surface;
-    auto result = onyx_image::runpaint_decoder::decode(data, surface);
+    auto result = onyx_image::runpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
 
     REQUIRE(result.ok);
 
@@ -191,7 +191,7 @@ TEST_CASE("Run Paint decoder: error handling") {
     SUBCASE("Empty data") {
         std::vector<std::uint8_t> data;
         onyx_image::memory_surface surface;
-        auto result = onyx_image::runpaint_decoder::decode(data, surface);
+        auto result = onyx_image::runpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 
@@ -200,7 +200,7 @@ TEST_CASE("Run Paint decoder: error handling") {
         data[0] = 0x00;
         data[1] = 0x60;
         onyx_image::memory_surface surface;
-        auto result = onyx_image::runpaint_decoder::decode(data, surface);
+        auto result = onyx_image::runpaint_decoder::decode(data, surface, onyx_image::decode_options{.output = onyx_image::color_output::rgb});
         CHECK_FALSE(result.ok);
     }
 
