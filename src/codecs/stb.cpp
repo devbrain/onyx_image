@@ -16,6 +16,7 @@
 #include "decode_helpers.hpp"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <cstring>
 #include <limits>
@@ -254,6 +255,213 @@ void tga_attach_palette(std::span<const std::uint8_t> d, surface& surf) {
     surf.write_palette(first, rgb);
 }
 
+// ----------------------------------------------------------------------------
+// Native indexed GIF decoding (color_output::source)
+//
+// stb_image only yields expanded RGBA, so to preserve the indexed
+// representation we decode the GIF's first image frame ourselves: GIF-LZW
+// decompress, honor interlacing, and carry the global/local color table plus
+// the transparent index. The RGBA/RGB paths still go through stb_image.
+// ----------------------------------------------------------------------------
+
+struct gif_frame {
+    int w = 0;
+    int h = 0;
+    std::vector<std::uint8_t> indices;    // w*h palette indices
+    std::vector<std::uint8_t> palette;    // RGB triplets
+    int palette_count = 0;
+    int transparent_index = -1;
+};
+
+// Decode a single GIF-LZW code stream into `expected` index bytes.
+bool gif_lzw_decode(std::span<const std::uint8_t> in, int min_code_size,
+                    std::size_t expected, std::vector<std::uint8_t>& out) {
+    if (min_code_size < 2 || min_code_size > 8) return false;
+    constexpr int MAX_CODES = 4096;
+    const int clear_code = 1 << min_code_size;
+    const int end_code = clear_code + 1;
+
+    std::array<int, MAX_CODES> prefix{};
+    std::array<std::uint8_t, MAX_CODES> suffix{};
+    std::array<std::uint8_t, MAX_CODES> stack{};
+    for (int i = 0; i < MAX_CODES; ++i) {
+        prefix[i] = -1;
+        suffix[i] = static_cast<std::uint8_t>(i < clear_code ? i : 0);
+    }
+
+    out.clear();
+    out.reserve(expected);
+
+    int code_size = min_code_size + 1;
+    int next_code = end_code + 1;
+    int prev = -1;
+    int first = 0;
+
+    std::size_t bit_pos = 0;
+    const std::size_t total_bits = in.size() * 8;
+    auto read_code = [&](int bits) -> int {
+        if (bit_pos + static_cast<std::size_t>(bits) > total_bits) return -1;
+        int value = 0;
+        for (int i = 0; i < bits; ++i) {
+            const std::size_t bp = bit_pos + static_cast<std::size_t>(i);
+            value |= ((in[bp >> 3] >> (bp & 7)) & 1) << i; // GIF packs codes LSB-first
+        }
+        bit_pos += static_cast<std::size_t>(bits);
+        return value;
+    };
+
+    while (out.size() < expected) {
+        const int code = read_code(code_size);
+        if (code < 0) break;                       // ran out of bits
+        if (code == clear_code) {
+            code_size = min_code_size + 1;
+            next_code = end_code + 1;
+            prev = -1;
+            continue;
+        }
+        if (code == end_code) break;
+
+        if (prev == -1) {                          // first symbol after a clear
+            if (code >= clear_code) return false;
+            first = code;
+            out.push_back(static_cast<std::uint8_t>(code));
+            prev = code;
+            continue;
+        }
+
+        int sp = 0;
+        int cur;
+        if (code < next_code) {
+            cur = code;
+        } else if (code == next_code) {            // KwKwK special case
+            stack[sp++] = static_cast<std::uint8_t>(first);
+            cur = prev;
+        } else {
+            return false;                          // code out of range
+        }
+
+        while (cur >= clear_code) {                // unwind to root
+            if (cur >= MAX_CODES || sp >= MAX_CODES) return false;
+            stack[sp++] = suffix[cur];
+            cur = prefix[cur];
+            if (cur < 0) return false;
+        }
+        first = suffix[cur];
+        stack[sp++] = static_cast<std::uint8_t>(first);
+
+        while (sp > 0 && out.size() < expected) out.push_back(stack[--sp]);
+
+        if (next_code < MAX_CODES) {               // add prev + first to the table
+            prefix[next_code] = prev;
+            suffix[next_code] = static_cast<std::uint8_t>(first);
+            ++next_code;
+            if (next_code == (1 << code_size) && code_size < 12) ++code_size;
+        }
+        prev = code;
+    }
+    return out.size() == expected;
+}
+
+// Reorder interlaced GIF rows (passes 8/8/4/2 starting at 0/4/2/1) into linear order.
+void gif_deinterlace(std::vector<std::uint8_t>& idx, int w, int h) {
+    std::vector<std::uint8_t> linear(static_cast<std::size_t>(w) * h);
+    const int starts[4] = {0, 4, 2, 1};
+    const int steps[4]  = {8, 8, 4, 2};
+    int src_row = 0;
+    for (int pass = 0; pass < 4; ++pass) {
+        for (int row = starts[pass]; row < h; row += steps[pass]) {
+            std::memcpy(&linear[static_cast<std::size_t>(row) * w],
+                        &idx[static_cast<std::size_t>(src_row) * w],
+                        static_cast<std::size_t>(w));
+            ++src_row;
+        }
+    }
+    idx.swap(linear);
+}
+
+// Decode the first image of a GIF into indices + palette. Returns false on any
+// structural problem, letting the caller fall back to stb's RGBA path.
+bool gif_decode_first_frame(std::span<const std::uint8_t> d, gif_frame& out) {
+    if (d.size() < 13) return false;
+    const std::uint8_t screen_packed = d[10];
+    std::size_t pos = 13;
+
+    std::span<const std::uint8_t> gct;
+    int gct_count = 0;
+    if (screen_packed & 0x80) {
+        gct_count = 2 << (screen_packed & 0x07);
+        const std::size_t bytes = static_cast<std::size_t>(gct_count) * 3;
+        if (pos + bytes > d.size()) return false;
+        gct = d.subspan(pos, bytes);
+        pos += bytes;
+    }
+
+    int transparent_index = -1;
+    while (pos < d.size()) {
+        const std::uint8_t block = d[pos++];
+        if (block == 0x3B) return false;           // trailer before any image
+        if (block == 0x21) {                       // extension
+            if (pos >= d.size()) return false;
+            const std::uint8_t label = d[pos++];
+            if (label == 0xF9 && pos < d.size() && d[pos] >= 4 && pos + 1 + d[pos] <= d.size()) {
+                const std::uint8_t flags = d[pos + 1];
+                if (flags & 0x01) transparent_index = d[pos + 4];
+            }
+            pos = gif_skip_sub_blocks(d, pos);
+            continue;
+        }
+        if (block != 0x2C) return false;           // unexpected
+
+        // Image descriptor: x(2) y(2) w(2) h(2) packed(1)
+        if (pos + 9 > d.size()) return false;
+        const int w = gif_read_u16le(d, pos + 4);
+        const int h = gif_read_u16le(d, pos + 6);
+        const std::uint8_t img_packed = d[pos + 8];
+        pos += 9;
+        if (w <= 0 || h <= 0) return false;
+
+        std::span<const std::uint8_t> lct;
+        int lct_count = 0;
+        if (img_packed & 0x80) {                   // local color table
+            lct_count = 2 << (img_packed & 0x07);
+            const std::size_t bytes = static_cast<std::size_t>(lct_count) * 3;
+            if (pos + bytes > d.size()) return false;
+            lct = d.subspan(pos, bytes);
+            pos += bytes;
+        }
+        const std::span<const std::uint8_t> palette = lct_count ? lct : gct;
+        const int palette_count = lct_count ? lct_count : gct_count;
+        if (palette_count == 0) return false;      // nothing to index against
+
+        // LZW data: min code size, then size-prefixed sub-blocks.
+        if (pos >= d.size()) return false;
+        const int min_code_size = d[pos++];
+        std::vector<std::uint8_t> lzw;
+        while (pos < d.size()) {
+            const std::uint8_t n = d[pos++];
+            if (n == 0) break;
+            if (pos + n > d.size()) return false;
+            lzw.insert(lzw.end(), d.begin() + static_cast<std::ptrdiff_t>(pos),
+                       d.begin() + static_cast<std::ptrdiff_t>(pos + n));
+            pos += n;
+        }
+
+        const std::size_t expected = static_cast<std::size_t>(w) * h;
+        std::vector<std::uint8_t> indices;
+        if (!gif_lzw_decode(lzw, min_code_size, expected, indices)) return false;
+        if (img_packed & 0x40) gif_deinterlace(indices, w, h);
+
+        out.w = w;
+        out.h = h;
+        out.indices = std::move(indices);
+        out.palette.assign(palette.begin(), palette.end());
+        out.palette_count = palette_count;
+        out.transparent_index = transparent_index;
+        return true;
+    }
+    return false;
+}
+
 } // namespace
 
 // ============================================================================
@@ -347,6 +555,26 @@ decode_result gif_decoder::decode(std::span<const std::uint8_t> data,
                                    const decode_options& options) {
     if (!sniff(data)) {
         return decode_result::failure(decode_error::invalid_format, "Not a valid GIF file");
+    }
+
+    // Preserve the indexed representation when the caller asks for source output.
+    // Falls back to the stb (RGBA) path if the native decode can't handle the file.
+    if (options.output == color_output::source) {
+        gif_frame frame;
+        if (gif_decode_first_frame(data, frame)) {
+            if (auto dim = validate_dimensions(frame.w, frame.h, options); !dim) return dim;
+            if (!surf.set_size(frame.w, frame.h, pixel_format::indexed8)) {
+                return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
+            }
+            surf.set_palette_size(frame.palette_count);
+            surf.write_palette(0, frame.palette);
+            if (frame.transparent_index >= 0) surf.set_transparent_index(frame.transparent_index);
+            for (int y = 0; y < frame.h; ++y) {
+                surf.write_pixels(0, y, frame.w, &frame.indices[static_cast<std::size_t>(y) * frame.w]);
+            }
+            return decode_result::success();
+        }
+        // fall through to stb expansion on any structural problem
     }
 
     // Repair GIFs that declare a 0-sized logical screen (see gif_patch_zero_screen).

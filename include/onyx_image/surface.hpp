@@ -82,6 +82,13 @@ public:
         (void)index;
         (void)sr;
     }
+
+    /**
+     * Set the transparent palette index (for indexed formats with transparency,
+     * e.g. GIF). A value < 0 means the image is fully opaque.
+     * @param index Transparent palette index, or -1 for none
+     */
+    virtual void set_transparent_index(int index) { (void)index; }
 };
 
 // ============================================================================
@@ -109,6 +116,7 @@ public:
     void set_palette_size(int count) override;
     void write_palette(int start, std::span<const std::uint8_t> colors) override;
     void set_subrect(int index, const subrect& sr) override;
+    void set_transparent_index(int index) override;
 
     // Accessors (read-only)
     [[nodiscard]] int width() const noexcept { return width_; }
@@ -119,6 +127,7 @@ public:
     [[nodiscard]] bool has_palette() const noexcept { return !palette_.empty(); }
     [[nodiscard]] const std::vector<subrect>& subrects() const noexcept { return subrects_; }
     [[nodiscard]] std::size_t pitch() const noexcept { return pitch_; }
+    [[nodiscard]] int transparent_index() const noexcept { return transparent_index_; }
 
     // Mutable accessors (for post-decode manipulation)
     [[nodiscard]] std::span<std::uint8_t> mutable_pixels() noexcept { return pixels_; }
@@ -132,6 +141,7 @@ private:
     int height_ = 0;
     std::size_t pitch_ = 0;
     pixel_format format_ = pixel_format::rgba8888;
+    int transparent_index_ = -1;
 };
 
 } // namespace onyx_image

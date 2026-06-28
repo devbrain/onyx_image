@@ -47,6 +47,7 @@ bool memory_surface::set_size(int width, int height, pixel_format format) {
 
     palette_.clear();
     subrects_.clear();
+    transparent_index_ = -1;
 
     return true;
 }
@@ -108,6 +109,10 @@ void memory_surface::write_palette(int start, std::span<const std::uint8_t> colo
 
     const std::size_t bytes_to_copy = std::min(colors.size(), palette_.size() - start_offset);
     std::memcpy(palette_.data() + start_offset, colors.data(), bytes_to_copy);
+}
+
+void memory_surface::set_transparent_index(int index) {
+    transparent_index_ = (index >= 0 && index <= 255) ? index : -1;
 }
 
 void memory_surface::set_subrect(int index, const subrect& sr) {

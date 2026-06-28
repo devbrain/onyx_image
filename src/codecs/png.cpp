@@ -150,6 +150,7 @@ std::vector<std::uint8_t> encode_png(const memory_surface& surf) {
             rgba_pixels.resize(w * h * 4);
             const auto* indices = surf.pixels().data();
             const auto palette = surf.palette();
+            const int transparent = surf.transparent_index();
             auto* dst = rgba_pixels.data();
 
             for (unsigned i = 0; i < w * h; ++i) {
@@ -166,7 +167,7 @@ std::vector<std::uint8_t> encode_png(const memory_surface& surf) {
                     dst[i * 4 + 1] = 0;
                     dst[i * 4 + 2] = 0;
                 }
-                dst[i * 4 + 3] = 255;
+                dst[i * 4 + 3] = (static_cast<int>(idx) == transparent) ? 0 : 255;
             }
             break;
         }
