@@ -133,15 +133,14 @@ void decode_c64_multicolor_frame(const std::uint8_t* content,
     }
 }
 
-// Apply interlace blending between two frames
+// Apply interlace blending between two frames into an RGB buffer
 void apply_blend(const std::vector<std::uint32_t>& frame1,
                  const std::vector<std::uint32_t>& frame2,
-                 surface& surf) {
+                 std::vector<std::uint32_t>& out) {
     for (int y = 0; y < c64::MULTICOLOR_HEIGHT; ++y) {
         for (int x = 0; x < c64::MULTICOLOR_WIDTH; ++x) {
             std::size_t idx = static_cast<std::size_t>(y * c64::MULTICOLOR_WIDTH + x);
-            std::uint32_t blended = c64::blend_rgb(frame1[idx], frame2[idx]);
-            c64::write_rgb_pixel(surf, x, y, blended);
+            out[idx] = c64::blend_rgb(frame1[idx], frame2[idx]);
         }
     }
 }
@@ -210,12 +209,6 @@ decode_result drazlace_decoder::decode(std::span<const std::uint8_t> data,
             "Image dimensions exceed limits");
     }
 
-    // Allocate surface (RGB output)
-    if (!surf.set_size(c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, pixel_format::rgb888)) {
-        return decode_result::failure(decode_error::internal_error,
-            "Failed to allocate surface");
-    }
-
     // Get background color
     std::uint8_t background = source_data[BACKGROUND_OFFSET];
 
@@ -231,8 +224,13 @@ decode_result drazlace_decoder::decode(std::span<const std::uint8_t> data,
     decode_c64_multicolor_frame(source_data, BITMAP2_OFFSET, VIDEO_MATRIX_OFFSET,
                                  COLOR_OFFSET, background, -shift, frame2);
 
-    // Apply interlace blending
-    apply_blend(frame1, frame2, surf);
+    // Apply interlace blending, then emit honouring the requested output.
+    std::vector<std::uint32_t> blended(c64::MULTICOLOR_WIDTH * c64::MULTICOLOR_HEIGHT);
+    apply_blend(frame1, frame2, blended);
+    if (!c64::emit_rgb_framebuffer(surf, blended.data(),
+                                   c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, options.output)) {
+        return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
+    }
 
     return decode_result::success();
 }

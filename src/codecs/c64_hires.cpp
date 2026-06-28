@@ -77,7 +77,7 @@ decode_result c64_hires_decoder::decode(std::span<const std::uint8_t> data,
     }
 
     // Allocate surface (RGB output)
-    if (!surf.set_size(c64::HIRES_WIDTH, c64::HIRES_HEIGHT, pixel_format::rgb888)) {
+    if (!c64::setup_surface(surf, c64::HIRES_WIDTH, c64::HIRES_HEIGHT, options.output)) {
         return decode_result::failure(decode_error::internal_error,
             "Failed to allocate surface");
     }
@@ -95,7 +95,7 @@ decode_result c64_hires_decoder::decode(std::span<const std::uint8_t> data,
     }
 
     // Decode the image using shared C64 hires decoder
-    c64::decode_hires(bitmap, video_matrix, fixed_colors, surf);
+    c64::decode_hires(bitmap, video_matrix, fixed_colors, surf, options.output);
 
     return decode_result::success();
 }

@@ -119,7 +119,7 @@ decode_result ami_decoder::decode(std::span<const std::uint8_t> data,
     }
 
     // Allocate surface (RGB output)
-    if (!surf.set_size(c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, pixel_format::rgb888)) {
+    if (!c64::setup_surface(surf, c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, options.output)) {
         return decode_result::failure(decode_error::internal_error,
             "Failed to allocate surface");
     }
@@ -135,7 +135,7 @@ decode_result ami_decoder::decode(std::span<const std::uint8_t> data,
     const std::uint8_t* color_ram = unpacked.data() + color_offset;
     std::uint8_t background = unpacked[background_offset];
 
-    c64::decode_multicolor(bitmap, screen_ram, color_ram, background, surf);
+    c64::decode_multicolor(bitmap, screen_ram, color_ram, background, surf, options.output);
 
     return decode_result::success();
 }

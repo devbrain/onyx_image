@@ -6,6 +6,8 @@
 
 #include <array>
 #include <cstdint>
+#include <span>
+#include <vector>
 
 namespace onyx_image::c64 {
 
@@ -71,6 +73,118 @@ inline void write_rgb_pixel(surface& surf, int x, int y, std::uint32_t rgb) {
     surf.write_pixels(x * RGB_BYTES, y, RGB_BYTES, pixel);
 }
 
+// ----------------------------------------------------------------------------
+// color_output-aware emission
+//
+// C64 images use the fixed 16-colour palette, so under color_output::source we
+// emit indexed8 + that palette; rgb/rgba expand through PALETTE. These helpers
+// let the shared decoders honour the requested representation centrally.
+// ----------------------------------------------------------------------------
+
+// Configure the surface for the chosen output (and install the 16-colour
+// palette for indexed8). Returns false on allocation failure.
+inline bool setup_surface(surface& surf, int w, int h, color_output out) {
+    const pixel_format fmt = out == color_output::source ? pixel_format::indexed8
+                           : out == color_output::rgb    ? pixel_format::rgb888
+                                                         : pixel_format::rgba8888;
+    if (!surf.set_size(w, h, fmt)) return false;
+    if (out == color_output::source) {
+        std::uint8_t pal[16 * 3];
+        for (int i = 0; i < 16; ++i) {
+            pal[i * 3 + 0] = static_cast<std::uint8_t>((PALETTE[i] >> 16) & 0xff);
+            pal[i * 3 + 1] = static_cast<std::uint8_t>((PALETTE[i] >> 8) & 0xff);
+            pal[i * 3 + 2] = static_cast<std::uint8_t>(PALETTE[i] & 0xff);
+        }
+        surf.set_palette_size(16);
+        surf.write_palette(0, std::span<const std::uint8_t>(pal, sizeof pal));
+    }
+    return true;
+}
+
+// Write a pixel given its C64 palette index (0-15), honouring the output mode.
+inline void write_index_pixel(surface& surf, int x, int y, std::uint8_t index, color_output out) {
+    const std::uint8_t i = index & 0x0f;
+    if (out == color_output::source) {
+        surf.write_pixels(x, y, 1, &i);
+        return;
+    }
+    const std::uint32_t rgb = PALETTE[i];
+    if (out == color_output::rgb) {
+        write_rgb_pixel(surf, x, y, rgb);
+    } else {
+        std::uint8_t px[4] = {
+            static_cast<std::uint8_t>((rgb >> 16) & 0xff),
+            static_cast<std::uint8_t>((rgb >> 8) & 0xff),
+            static_cast<std::uint8_t>(rgb & 0xff),
+            0xff,
+        };
+        surf.write_pixels(x * 4, y, 4, px);
+    }
+}
+
+// Emit a fully-rendered RGB framebuffer (e.g. from blended interlaced formats)
+// honouring color_output. For source, builds a palette from the unique colours
+// (<=256); if there are more, falls back to rgb888. Returns false on failure.
+inline bool emit_rgb_framebuffer(surface& surf, const std::uint32_t* rgb,
+                                 int w, int h, color_output out) {
+    const std::size_t count = static_cast<std::size_t>(w) * static_cast<std::size_t>(h);
+
+    if (out == color_output::source) {
+        // Build a small palette of unique colours (<=256).
+        std::uint32_t colors[256];
+        int n = 0;
+        std::vector<std::uint8_t> indices(count);
+        bool overflow = false;
+        for (std::size_t p = 0; p < count; ++p) {
+            const std::uint32_t c = rgb[p] & 0xffffff;
+            int idx = -1;
+            for (int k = 0; k < n; ++k) {
+                if (colors[k] == c) { idx = k; break; }
+            }
+            if (idx < 0) {
+                if (n >= 256) { overflow = true; break; }
+                colors[n] = c;
+                idx = n++;
+            }
+            indices[p] = static_cast<std::uint8_t>(idx);
+        }
+        if (!overflow) {
+            if (!surf.set_size(w, h, pixel_format::indexed8)) return false;
+            std::vector<std::uint8_t> pal(static_cast<std::size_t>(n) * 3);
+            for (int k = 0; k < n; ++k) {
+                pal[k * 3 + 0] = static_cast<std::uint8_t>((colors[k] >> 16) & 0xff);
+                pal[k * 3 + 1] = static_cast<std::uint8_t>((colors[k] >> 8) & 0xff);
+                pal[k * 3 + 2] = static_cast<std::uint8_t>(colors[k] & 0xff);
+            }
+            surf.set_palette_size(n);
+            surf.write_palette(0, pal);
+            for (int y = 0; y < h; ++y) {
+                surf.write_pixels(0, y, w, &indices[static_cast<std::size_t>(y) * w]);
+            }
+            return true;
+        }
+        // too many colours: fall through to rgb expansion
+    }
+
+    const bool rgba = out == color_output::rgba;
+    if (!surf.set_size(w, h, rgba ? pixel_format::rgba8888 : pixel_format::rgb888)) return false;
+    for (int y = 0; y < h; ++y) {
+        for (int x = 0; x < w; ++x) {
+            const std::uint32_t c = rgb[static_cast<std::size_t>(y) * w + x];
+            if (rgba) {
+                std::uint8_t px[4] = {
+                    static_cast<std::uint8_t>((c >> 16) & 0xff),
+                    static_cast<std::uint8_t>((c >> 8) & 0xff),
+                    static_cast<std::uint8_t>(c & 0xff), 0xff};
+                surf.write_pixels(x * 4, y, 4, px);
+            } else {
+                write_rgb_pixel(surf, x, y, c);
+            }
+        }
+    }
+    return true;
+}
+
 /**
  * Blend two RGB colors using byte-by-byte averaging.
  * Used for interlaced/IFLI formats.
@@ -101,7 +215,8 @@ inline void decode_multicolor(const std::uint8_t* bitmap,
                               const std::uint8_t* screen_ram,
                               const std::uint8_t* color_ram,
                               std::uint8_t background,
-                              surface& surf) {
+                              surface& surf,
+                              color_output out = color_output::rgb) {
     for (int y = 0; y < MULTICOLOR_HEIGHT; ++y) {
         for (int x = 0; x < MULTICOLOR_WIDTH; ++x) {
             // Calculate character cell position
@@ -140,7 +255,7 @@ inline void decode_multicolor(const std::uint8_t* bitmap,
                     break;
             }
 
-            write_rgb_pixel(surf, x, y, PALETTE[color_index]);
+            write_index_pixel(surf, x, y, color_index, out);
         }
     }
 }
@@ -157,7 +272,8 @@ inline void decode_multicolor(const std::uint8_t* bitmap,
 inline void decode_hires(const std::uint8_t* bitmap,
                          const std::uint8_t* video_matrix,
                          std::uint8_t fixed_colors,
-                         surface& surf) {
+                         surface& surf,
+                         color_output out = color_output::rgb) {
     constexpr int stride = 40;  // Characters per row
 
     for (int y = 0; y < HIRES_HEIGHT; ++y) {
@@ -189,7 +305,7 @@ inline void decode_hires(const std::uint8_t* bitmap,
                 ? (color_byte & 0x0f)
                 : ((color_byte >> 4) & 0x0f);
 
-            write_rgb_pixel(surf, x, y, PALETTE[color_index]);
+            write_index_pixel(surf, x, y, color_index, out);
         }
     }
 }

@@ -237,12 +237,6 @@ decode_result funpaint_decoder::decode(std::span<const std::uint8_t> data,
         }
     }
 
-    // Allocate surface (RGB output)
-    if (!surf.set_size(c64::FLI_WIDTH, HEIGHT, pixel_format::rgb888)) {
-        return decode_result::failure(decode_error::internal_error,
-            "Failed to allocate surface");
-    }
-
     // Allocate pixel buffers for two frames
     std::vector<std::uint32_t> pixels(static_cast<std::size_t>(c64::FLI_WIDTH * HEIGHT * 2));
 
@@ -255,15 +249,10 @@ decode_result funpaint_decoder::decode(std::span<const std::uint8_t> data,
                      COLOR_OFFSET, 0, -1, pixels,
                      static_cast<std::size_t>(c64::FLI_WIDTH * HEIGHT));
 
-    // Blend frames
+    // Blend frames, then emit honouring the requested output.
     apply_blend(pixels);
-
-    // Write blended pixels to surface
-    for (int y = 0; y < HEIGHT; ++y) {
-        for (int x = 0; x < c64::FLI_WIDTH; ++x) {
-            std::uint32_t rgb = pixels[static_cast<std::size_t>(y * c64::FLI_WIDTH + x)];
-            c64::write_rgb_pixel(surf, x, y, rgb);
-        }
+    if (!c64::emit_rgb_framebuffer(surf, pixels.data(), c64::FLI_WIDTH, HEIGHT, options.output)) {
+        return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
     }
 
     return decode_result::success();

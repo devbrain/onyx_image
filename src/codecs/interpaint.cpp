@@ -57,7 +57,7 @@ decode_result interpaint_decoder::decode(std::span<const std::uint8_t> data,
                 "Image dimensions exceed limits");
         }
 
-        if (!surf.set_size(c64::HIRES_WIDTH, c64::HIRES_HEIGHT, pixel_format::rgb888)) {
+        if (!c64::setup_surface(surf, c64::HIRES_WIDTH, c64::HIRES_HEIGHT, options.output)) {
             return decode_result::failure(decode_error::internal_error,
                 "Failed to allocate surface");
         }
@@ -66,7 +66,7 @@ decode_result interpaint_decoder::decode(std::span<const std::uint8_t> data,
         const std::uint8_t* bitmap = data.data() + 2;
         const std::uint8_t* video_matrix = data.data() + 0x1f42;
 
-        c64::decode_hires(bitmap, video_matrix, 0x10, surf);
+        c64::decode_hires(bitmap, video_matrix, 0x10, surf, options.output);
 
     } else if (data.size() == IPT_SIZE) {
         // IPT: Multicolor format
@@ -80,7 +80,7 @@ decode_result interpaint_decoder::decode(std::span<const std::uint8_t> data,
                 "Image dimensions exceed limits");
         }
 
-        if (!surf.set_size(c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, pixel_format::rgb888)) {
+        if (!c64::setup_surface(surf, c64::MULTICOLOR_WIDTH, c64::MULTICOLOR_HEIGHT, options.output)) {
             return decode_result::failure(decode_error::internal_error,
                 "Failed to allocate surface");
         }
@@ -96,7 +96,7 @@ decode_result interpaint_decoder::decode(std::span<const std::uint8_t> data,
         const std::uint8_t* color_ram = data.data() + color_offset;
         std::uint8_t background = data[background_offset];
 
-        c64::decode_multicolor(bitmap, screen_ram, color_ram, background, surf);
+        c64::decode_multicolor(bitmap, screen_ram, color_ram, background, surf, options.output);
 
     } else {
         return decode_result::failure(decode_error::invalid_format,
