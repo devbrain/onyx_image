@@ -15,9 +15,13 @@
 #include <onyx_image/codecs/gif.hpp>
 #include "decode_helpers.hpp"
 
+#include <algorithm>
+#include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <optional>
+#include <vector>
 
 namespace onyx_image {
 
@@ -78,6 +82,108 @@ decode_result stb_decode_common(std::span<const std::uint8_t> data,
     write_rows(surf, pixels, static_cast<std::size_t>(width) * 4, height);
 
     return decode_result::success();
+}
+
+// ----------------------------------------------------------------------------
+// GIF logical-screen repair
+//
+// Some DOS-era GIF encoders write a Logical Screen Descriptor with width and/or
+// height set to 0 and store the real dimensions only in the first Image
+// Descriptor. stb_image enforces that every frame fits within the logical
+// screen, so it rejects these files with "bad Image Descriptor". Lenient
+// decoders (PIL, ImageMagick) derive the canvas from the image descriptors
+// instead. We do the same: scan the frames, compute the bounding canvas, and
+// patch the zero field(s) on a private copy before handing it to stb_image.
+// ----------------------------------------------------------------------------
+
+constexpr int gif_read_u16le(std::span<const std::uint8_t> data, std::size_t off) noexcept {
+    return static_cast<int>(data[off]) | (static_cast<int>(data[off + 1]) << 8);
+}
+
+// Skip a chain of size-prefixed GIF sub-blocks, returning the position just
+// past the terminating zero-length block.
+std::size_t gif_skip_sub_blocks(std::span<const std::uint8_t> data, std::size_t pos) noexcept {
+    while (pos < data.size()) {
+        const std::uint8_t n = data[pos++];
+        if (n == 0) break;
+        pos += n;
+    }
+    return pos;
+}
+
+// Walk every Image Descriptor and return the canvas size required to contain
+// all frames (max x+w, max y+h). Returns {0, 0} if none are found.
+struct gif_extent { int w; int h; };
+
+gif_extent gif_required_canvas(std::span<const std::uint8_t> data) noexcept {
+    constexpr std::size_t header_size = 13; // signature(6) + LSD(7)
+    if (data.size() < header_size) return {0, 0};
+
+    std::size_t pos = header_size;
+    const std::uint8_t packed = data[10];
+    if (packed & 0x80) { // global color table present
+        pos += (std::size_t{2} << (packed & 0x07)) * 3;
+    }
+
+    int max_w = 0;
+    int max_h = 0;
+    while (pos < data.size()) {
+        const std::uint8_t block = data[pos++];
+        if (block == 0x3B) { // trailer
+            break;
+        } else if (block == 0x21) { // extension
+            if (pos >= data.size()) break;
+            ++pos; // label
+            pos = gif_skip_sub_blocks(data, pos);
+        } else if (block == 0x2C) { // image descriptor
+            if (pos + 9 > data.size()) break;
+            const int x = gif_read_u16le(data, pos + 0);
+            const int y = gif_read_u16le(data, pos + 2);
+            const int w = gif_read_u16le(data, pos + 4);
+            const int h = gif_read_u16le(data, pos + 6);
+            const std::uint8_t img_packed = data[pos + 8];
+            pos += 9;
+            max_w = std::max(max_w, x + w);
+            max_h = std::max(max_h, y + h);
+            if (img_packed & 0x80) { // local color table present
+                pos += (std::size_t{2} << (img_packed & 0x07)) * 3;
+            }
+            if (pos >= data.size()) break;
+            ++pos; // LZW minimum code size
+            pos = gif_skip_sub_blocks(data, pos);
+        } else {
+            break; // unexpected byte; stop scanning
+        }
+    }
+    return {max_w, max_h};
+}
+
+// If the logical screen width/height is zero, return a patched copy of the GIF
+// with the field(s) filled in from the image descriptors. Returns nullopt when
+// no patch is needed or a sensible canvas could not be derived (in which case
+// the original data is handed to stb_image unchanged).
+std::optional<std::vector<std::uint8_t>> gif_patch_zero_screen(std::span<const std::uint8_t> data) {
+    if (data.size() < 13) return std::nullopt;
+
+    const bool zero_w = gif_read_u16le(data, 6) == 0;
+    const bool zero_h = gif_read_u16le(data, 8) == 0;
+    if (!zero_w && !zero_h) return std::nullopt;
+
+    const gif_extent canvas = gif_required_canvas(data);
+    const bool need_w = zero_w && (canvas.w <= 0 || canvas.w > 0xFFFF);
+    const bool need_h = zero_h && (canvas.h <= 0 || canvas.h > 0xFFFF);
+    if (need_w || need_h) return std::nullopt; // can't fix; let stb report it
+
+    std::vector<std::uint8_t> copy(data.begin(), data.end());
+    if (zero_w) {
+        copy[6] = static_cast<std::uint8_t>(canvas.w & 0xFF);
+        copy[7] = static_cast<std::uint8_t>((canvas.w >> 8) & 0xFF);
+    }
+    if (zero_h) {
+        copy[8] = static_cast<std::uint8_t>(canvas.h & 0xFF);
+        copy[9] = static_cast<std::uint8_t>((canvas.h >> 8) & 0xFF);
+    }
+    return copy;
 }
 
 } // namespace
@@ -170,6 +276,12 @@ decode_result gif_decoder::decode(std::span<const std::uint8_t> data,
     if (!sniff(data)) {
         return decode_result::failure(decode_error::invalid_format, "Not a valid GIF file");
     }
+
+    // Repair GIFs that declare a 0-sized logical screen (see gif_patch_zero_screen).
+    if (auto patched = gif_patch_zero_screen(data)) {
+        return stb_decode_common(*patched, surf, options);
+    }
+
     return stb_decode_common(data, surf, options);
 }
 
