@@ -116,6 +116,7 @@ public:
     [[nodiscard]] pixel_format format() const noexcept { return format_; }
     [[nodiscard]] std::span<const std::uint8_t> pixels() const noexcept { return pixels_; }
     [[nodiscard]] std::span<const std::uint8_t> palette() const noexcept { return palette_; }
+    [[nodiscard]] bool has_palette() const noexcept { return !palette_.empty(); }
     [[nodiscard]] const std::vector<subrect>& subrects() const noexcept { return subrects_; }
     [[nodiscard]] std::size_t pitch() const noexcept { return pitch_; }
 

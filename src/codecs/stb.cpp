@@ -186,6 +186,70 @@ std::optional<std::vector<std::uint8_t>> gif_patch_zero_screen(std::span<const s
     return copy;
 }
 
+// ----------------------------------------------------------------------------
+// Source-palette metadata
+//
+// stb_image always expands paletted formats to truecolor, discarding the
+// original color table. We parse it ourselves and attach it to the surface via
+// write_palette so callers can reach the source palette even though the pixels
+// are RGBA. The pixel format is left untouched (Phase 1: palette as metadata).
+// ----------------------------------------------------------------------------
+
+// Attach a GIF's global color table to the surface. No-op if the file has no
+// global color table (e.g. it relies solely on per-frame local tables).
+void gif_attach_palette(std::span<const std::uint8_t> d, surface& surf) {
+    if (d.size() < 13) return;
+    const std::uint8_t packed = d[10];
+    if (!(packed & 0x80)) return;                       // no global color table
+    const int entries = 2 << (packed & 0x07);           // 2^(N+1)
+    const std::size_t bytes = static_cast<std::size_t>(entries) * 3;
+    if (13 + bytes > d.size()) return;
+    surf.set_palette_size(entries);
+    surf.write_palette(0, d.subspan(13, bytes));        // GIF stores RGB triplets
+}
+
+// Attach a colormapped TGA's palette to the surface, converting the stored
+// little-endian BGR(A) entries to the RGB888 triplets onyx_image uses. No-op
+// for non-colormapped TGAs.
+void tga_attach_palette(std::span<const std::uint8_t> d, surface& surf) {
+    if (d.size() < 18) return;
+    if (d[1] != 1) return;                              // color map type: 1 = present
+    const int first  = d[3] | (d[4] << 8);             // first entry index
+    const int length = d[5] | (d[6] << 8);             // number of entries
+    const int entry_bits = d[7];
+    if (length <= 0 || first < 0 || first + length > 256) return;
+    if (entry_bits != 15 && entry_bits != 16 && entry_bits != 24 && entry_bits != 32) return;
+
+    const int entry_bytes = (entry_bits + 7) / 8;
+    const std::size_t cmap_off = std::size_t{18} + d[0]; // skip header + image ID field
+    const std::size_t cmap_bytes = static_cast<std::size_t>(length) * entry_bytes;
+    if (cmap_off + cmap_bytes > d.size()) return;
+
+    std::vector<std::uint8_t> rgb(static_cast<std::size_t>(length) * 3);
+    for (int i = 0; i < length; ++i) {
+        const std::uint8_t* p = d.data() + cmap_off + static_cast<std::size_t>(i) * entry_bytes;
+        std::uint8_t r, g, b;
+        if (entry_bytes == 2) {                         // 15/16-bit: (A)RRRRRGGGGGBBBBB, LE
+            const unsigned v = static_cast<unsigned>(p[0]) | (static_cast<unsigned>(p[1]) << 8);
+            const auto exp5 = [](unsigned c) {
+                return static_cast<std::uint8_t>((c << 3) | (c >> 2));
+            };
+            r = exp5((v >> 10) & 0x1F);
+            g = exp5((v >> 5) & 0x1F);
+            b = exp5(v & 0x1F);
+        } else {                                        // 24/32-bit: B, G, R, (A)
+            b = p[0];
+            g = p[1];
+            r = p[2];
+        }
+        rgb[static_cast<std::size_t>(i) * 3 + 0] = r;
+        rgb[static_cast<std::size_t>(i) * 3 + 1] = g;
+        rgb[static_cast<std::size_t>(i) * 3 + 2] = b;
+    }
+    surf.set_palette_size(first + length);
+    surf.write_palette(first, rgb);
+}
+
 } // namespace
 
 // ============================================================================
@@ -254,7 +318,11 @@ decode_result tga_decoder::decode(std::span<const std::uint8_t> data,
     if (!sniff(data)) {
         return decode_result::failure(decode_error::invalid_format, "Not a valid TGA file");
     }
-    return stb_decode_common(data, surf, options);
+    auto result = stb_decode_common(data, surf, options);
+    if (result) {
+        tga_attach_palette(data, surf); // expose source palette as metadata
+    }
+    return result;
 }
 
 // ============================================================================
@@ -278,11 +346,14 @@ decode_result gif_decoder::decode(std::span<const std::uint8_t> data,
     }
 
     // Repair GIFs that declare a 0-sized logical screen (see gif_patch_zero_screen).
-    if (auto patched = gif_patch_zero_screen(data)) {
-        return stb_decode_common(*patched, surf, options);
-    }
+    auto patched = gif_patch_zero_screen(data);
+    const std::span<const std::uint8_t> input = patched ? std::span<const std::uint8_t>(*patched) : data;
 
-    return stb_decode_common(data, surf, options);
+    auto result = stb_decode_common(input, surf, options);
+    if (result) {
+        gif_attach_palette(input, surf); // expose source palette as metadata
+    }
+    return result;
 }
 
 } // namespace onyx_image
