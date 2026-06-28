@@ -93,10 +93,20 @@ struct decode_result {
 // Decode Options
 // ============================================================================
 
+// Controls the pixel representation a decoder produces.
+enum class color_output {
+    source,  // indexed8 + palette when the file is natively paletted; else truecolor (rgba8888)
+    rgba,    // always expand to rgba8888
+    rgb      // always expand to rgb888
+};
+
 struct decode_options {
     // Maximum allowed dimensions (0 = use default)
     int max_width = 16384;
     int max_height = 16384;
+
+    // Desired pixel representation (see color_output).
+    color_output output = color_output::source;
 
     // Packing options for multi-image containers
     bool enable_packing = false;

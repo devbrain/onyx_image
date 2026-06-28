@@ -51,8 +51,12 @@ decode_result stb_decode_common(std::span<const std::uint8_t> data,
     int height = 0;
     int channels = 0;
 
-    // Request RGBA output
-    constexpr int desired_channels = 4;
+    // stb_image only produces truecolor output, so color_output::source maps to
+    // rgba8888 here; the indexed path is handled by the format-specific decoders
+    // before this helper is reached. color_output::rgb requests 3 channels.
+    const bool want_rgb = options.output == color_output::rgb;
+    const int desired_channels = want_rgb ? 3 : 4;
+    const pixel_format out_format = want_rgb ? pixel_format::rgb888 : pixel_format::rgba8888;
 
     stbi_uc* pixels = stbi_load_from_memory(
         data.data(),
@@ -74,12 +78,12 @@ decode_result stb_decode_common(std::span<const std::uint8_t> data,
     auto result = validate_dimensions(width, height, options);
     if (!result) return result;
 
-    if (!surf.set_size(width, height, pixel_format::rgba8888)) {
+    if (!surf.set_size(width, height, out_format)) {
         return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
     }
 
     // Copy pixel data to surface
-    write_rows(surf, pixels, static_cast<std::size_t>(width) * 4, height);
+    write_rows(surf, pixels, static_cast<std::size_t>(width) * desired_channels, height);
 
     return decode_result::success();
 }
