@@ -96,19 +96,26 @@ decode_result png_decoder::decode(std::span<const std::uint8_t> data,
                 h <= static_cast<unsigned>(std::numeric_limits<int>::max())) {
                 const unsigned char* pal = state.info_png.color.palette;
                 const std::size_t pal_count = state.info_png.color.palettesize;
-                if (pal && pal_count > 0 &&
+                // Keep the compact indexed form only for a fully-opaque palette. If the
+                // PNG carries tRNS transparency (any palette entry with alpha < 255),
+                // fall through to the RGBA decode below so the per-pixel alpha survives.
+                // The indexed surface's single transparent-index model cannot represent
+                // partial or multi-index transparency, and consumers that rebuild an
+                // SDL/GPU palette downstream would drop it entirely.
+                bool opaque = pal != nullptr && pal_count > 0;
+                for (std::size_t i = 0; opaque && i < pal_count; ++i) {
+                    if (pal[i * 4 + 3] != 255) opaque = false;
+                }
+                if (opaque &&
                     surf.set_size(static_cast<int>(w), static_cast<int>(h), pixel_format::indexed8)) {
                     std::vector<std::uint8_t> rgb(pal_count * 3);
-                    int transparent = -1;
                     for (std::size_t i = 0; i < pal_count; ++i) {
                         rgb[i * 3 + 0] = pal[i * 4 + 0];
                         rgb[i * 3 + 1] = pal[i * 4 + 1];
                         rgb[i * 3 + 2] = pal[i * 4 + 2];
-                        if (pal[i * 4 + 3] == 0 && transparent < 0) transparent = static_cast<int>(i);
                     }
                     surf.set_palette_size(static_cast<int>(pal_count));
                     surf.write_palette(0, rgb);
-                    if (transparent >= 0) surf.set_transparent_index(transparent);
                     for (unsigned y = 0; y < h; ++y) {
                         surf.write_pixels(0, static_cast<int>(y), static_cast<int>(w),
                                           &idx[static_cast<std::size_t>(y) * w]);
