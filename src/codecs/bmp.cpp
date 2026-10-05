@@ -406,23 +406,68 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
         }
     }
 
-    // Determine output format
-    pixel_format out_format;
-    if (info.bits_per_pixel <= 8 && !palette.empty()) {
-        out_format = pixel_format::indexed8;
-    } else {
-        out_format = pixel_format::rgba8888;
-    }
+    // Output format: color_output::source keeps a paletted image indexed (truecolor otherwise); rgba and rgb
+    // always expand to that truecolor format
+    const bool paletted = info.bits_per_pixel <= 8 && !palette.empty();
+    const color_output out = options.output;
+    const pixel_format out_format = out == color_output::rgba ? pixel_format::rgba8888
+                                  : out == color_output::rgb  ? pixel_format::rgb888
+                                  : paletted                  ? pixel_format::indexed8
+                                                              : pixel_format::rgba8888;
+    const std::size_t out_bpp = bytes_per_pixel(out_format);
 
     if (!surf.set_size(info.width, info.height, out_format)) {
         return decode_result::failure(decode_error::internal_error, "Failed to allocate surface");
     }
 
     // Set palette if indexed
-    if (out_format == pixel_format::indexed8 && !palette.empty()) {
+    if (out_format == pixel_format::indexed8) {
         surf.set_palette_size(static_cast<int>(info.colors_used));
         surf.write_palette(0, palette);
     }
+
+    std::vector<std::uint8_t> out_row(static_cast<std::size_t>(info.width) * out_bpp);
+
+    // One row of RGBA pixels, written in the output format
+    const auto write_rgba_row = [&](int y, const std::uint8_t* rgba) {
+        if (out_format == pixel_format::rgba8888) {
+            surf.write_pixels(0, y, info.width * 4, rgba);
+            return;
+        }
+        for (int x = 0; x < info.width; x++) {
+            out_row[static_cast<std::size_t>(x) * 3 + 0] = rgba[x * 4 + 0];
+            out_row[static_cast<std::size_t>(x) * 3 + 1] = rgba[x * 4 + 1];
+            out_row[static_cast<std::size_t>(x) * 3 + 2] = rgba[x * 4 + 2];
+        }
+        surf.write_pixels(0, y, info.width * 3, out_row.data());
+    };
+
+    // One row of palette indices: written as they are, or looked up (gray levels without a palette)
+    std::vector<std::uint8_t> rgba_row(static_cast<std::size_t>(info.width) * 4);
+    const auto write_index_row = [&](int y, const std::uint8_t* indices) {
+        if (out_format == pixel_format::indexed8) {
+            surf.write_pixels(0, y, info.width, indices);
+            return;
+        }
+        const int levels = info.bits_per_pixel >= 8 ? 255 : (1 << info.bits_per_pixel) - 1;
+        for (int x = 0; x < info.width; x++) {
+            const std::uint8_t i = indices[x];
+            std::uint8_t* dst = rgba_row.data() + static_cast<std::size_t>(x) * 4;
+            if (!palette.empty()) {
+                if (i < info.colors_used) {
+                    dst[0] = palette[static_cast<std::size_t>(i) * 3 + 0];
+                    dst[1] = palette[static_cast<std::size_t>(i) * 3 + 1];
+                    dst[2] = palette[static_cast<std::size_t>(i) * 3 + 2];
+                } else {
+                    dst[0] = dst[1] = dst[2] = 0;
+                }
+            } else {
+                dst[0] = dst[1] = dst[2] = static_cast<std::uint8_t>(std::min(255, i * 255 / (levels > 0 ? levels : 1)));
+            }
+            dst[3] = 0xFF;
+        }
+        write_rgba_row(y, rgba_row.data());
+    };
 
     // Handle RLE compression
     if (info.compression == BI_RLE8 || info.compression == BI_RLE4) {
@@ -436,7 +481,7 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
         // Write to surface (RLE is always bottom-up, need to flip)
         for (int y = 0; y < info.height; y++) {
             int src_y = info.height - 1 - y;
-            surf.write_pixels(0, y, info.width, indices.data() + static_cast<std::size_t>(src_y) * info.width);
+            write_index_row(y, indices.data() + static_cast<std::size_t>(src_y) * info.width);
         }
         return decode_result::success();
     }
@@ -458,7 +503,7 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
             for (int x = 0; x < info.width; x++) {
                 row_buffer[x] = extract_pixel(src_row, x, info.bits_per_pixel);
             }
-            surf.write_pixels(0, y, info.width, row_buffer.data());
+            write_index_row(y, row_buffer.data());
         } else if (info.bits_per_pixel == 16) {
             // 16-bit RGB
             for (int x = 0; x < info.width; x++) {
@@ -471,7 +516,7 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
                 row_buffer[x * 4 + 2] = b;
                 row_buffer[x * 4 + 3] = 0xFF;
             }
-            surf.write_pixels(0, y, info.width * 4, row_buffer.data());
+            write_rgba_row(y, row_buffer.data());
         } else if (info.bits_per_pixel == 24) {
             // 24-bit BGR
             for (int x = 0; x < info.width; x++) {
@@ -480,7 +525,7 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
                 row_buffer[x * 4 + 2] = src_row[x * 3 + 0];  // B
                 row_buffer[x * 4 + 3] = 0xFF;
             }
-            surf.write_pixels(0, y, info.width * 4, row_buffer.data());
+            write_rgba_row(y, row_buffer.data());
         } else if (info.bits_per_pixel == 32) {
             // 32-bit BGRA
             for (int x = 0; x < info.width; x++) {
@@ -489,7 +534,7 @@ decode_result bmp_decoder::decode(std::span<const std::uint8_t> data,
                 row_buffer[x * 4 + 2] = src_row[x * 4 + 0];  // B
                 row_buffer[x * 4 + 3] = info.alpha_mask ? src_row[x * 4 + 3] : 0xFF;
             }
-            surf.write_pixels(0, y, info.width * 4, row_buffer.data());
+            write_rgba_row(y, row_buffer.data());
         }
     }
 

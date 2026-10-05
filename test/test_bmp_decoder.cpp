@@ -169,3 +169,60 @@ TEST_CASE("BMP decoder: MD5 verification") {
         test_bmp_decode_md5("test32v5.bmp", "914d5d4f8f352dbca443a2ba0058c488", "Windows V5 24-bit");
     }
 }
+
+namespace {
+
+/// Decodes `filename` with `output` and with color_output::source, and checks that every pixel of the first is
+/// the second's color (looked up in its palette when indexed), opaque
+void check_expanded_output(const char* filename, onyx_image::color_output output) {
+    const std::filesystem::path path = std::filesystem::path(TEST_DATA_DIR) / "bmp" / filename;
+    INFO("Testing: ", filename);
+    auto data = read_file(path);
+    REQUIRE(!data.empty());
+
+    onyx_image::memory_surface source;
+    REQUIRE(onyx_image::decode(data, source).ok);
+
+    onyx_image::decode_options options;
+    options.output = output;
+    onyx_image::memory_surface expanded;
+    REQUIRE(onyx_image::decode(data, expanded, options).ok);
+
+    const bool rgba = output == onyx_image::color_output::rgba;
+    REQUIRE(expanded.format() == (rgba ? onyx_image::pixel_format::rgba8888 : onyx_image::pixel_format::rgb888));
+    REQUIRE(expanded.width() == source.width());
+    REQUIRE(expanded.height() == source.height());
+
+    const std::size_t out_bpp = rgba ? 4 : 3;
+    const std::size_t src_bpp = onyx_image::bytes_per_pixel(source.format());
+    int mismatches = 0;
+    for (int y = 0; y < source.height(); ++y) {
+        for (int x = 0; x < source.width(); ++x) {
+            const std::uint8_t* s = source.pixels().data() + static_cast<std::size_t>(y) * source.pitch() +
+                                    static_cast<std::size_t>(x) * src_bpp;
+            const std::uint8_t* e = expanded.pixels().data() + static_cast<std::size_t>(y) * expanded.pitch() +
+                                    static_cast<std::size_t>(x) * out_bpp;
+            std::uint8_t r = s[0], g = s[1], b = s[2];
+            if (source.format() == onyx_image::pixel_format::indexed8) {
+                const std::size_t i = s[0];
+                r = source.palette()[i * 3 + 0];
+                g = source.palette()[i * 3 + 1];
+                b = source.palette()[i * 3 + 2];
+            }
+            const bool same = e[0] == r && e[1] == g && e[2] == b && (!rgba || e[3] == 0xFF ||
+                              (source.format() == onyx_image::pixel_format::rgba8888 && e[3] == s[3]));
+            mismatches += same ? 0 : 1;
+        }
+    }
+    CHECK(mismatches == 0);
+}
+
+} // namespace
+
+TEST_CASE("BMP decoder: color_output::rgba and ::rgb expand paletted images") {
+    for (const char* file : {"test1.bmp", "test4.bmp", "test8.bmp", "testcompress4.bmp", "testcompress8.bmp",
+                             "11Bios13.bmp", "test24.bmp", "test32.bmp"}) {
+        check_expanded_output(file, onyx_image::color_output::rgba);
+        check_expanded_output(file, onyx_image::color_output::rgb);
+    }
+}
